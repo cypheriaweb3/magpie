@@ -228,9 +228,10 @@ func codexInstructions(model string) string {
 		return s
 	}
 	dir := os.Getenv("CODEX_HOME")
-	if dir == "" {
-		home, _ := os.UserHomeDir()
-		dir = filepath.Join(home, ".codex")
+	if runtimeHomeConfigured("codex") {
+		dir = filepath.Join(RuntimeHome("codex"), ".codex")
+	} else if dir == "" {
+		dir = filepath.Join(RuntimeHome("codex"), ".codex")
 	}
 	if s, ok := codexCLIPrompts.get(filepath.Join(dir, "models_cache.json"), model, codexPrompts); ok {
 		return s

@@ -82,15 +82,14 @@ type zcodeKey struct {
 // ---- ZCode's own account ------------------------------------------------------
 
 func zcodeCredentialsPath() string {
-	home, _ := os.UserHomeDir()
-	return filepath.Join(home, ".zcode", "v2", "credentials.json")
+	return filepath.Join(RuntimeHome("zcode"), ".zcode", "v2", "credentials.json")
 }
 
 // zcodeSecret is the key ZCode encrypts its credentials with.
 func zcodeSecret() []byte {
 	seed := os.Getenv("ZCODE_CREDENTIAL_SECRET")
 	if seed == "" {
-		home, _ := os.UserHomeDir()
+		home := RuntimeHome("zcode")
 		name := ""
 		if u, err := user.Current(); err == nil {
 			name = u.Username

@@ -340,6 +340,9 @@ type claudeCredentialLocation struct {
 // claudeCredentialsPath is Claude Code's credentials file, where it keeps
 // its sign-in off the Mac's keychain.
 func claudeCredentialsPath() string {
+	if runtimeHomeConfigured("claude") {
+		return filepath.Join(RuntimeHome("claude"), ".claude", ".credentials.json")
+	}
 	dir := os.Getenv("CLAUDE_CONFIG_DIR")
 	if dir == "" {
 		home, _ := os.UserHomeDir()
@@ -355,7 +358,7 @@ func readClaudeCredential() (claudeCredentials, claudeCredentialLocation, bool) 
 			return c, claudeCredentialLocation{path: path}, true
 		}
 	}
-	if !claudeKeychain {
+	if !claudeKeychain || runtimeHomeConfigured("claude") {
 		return claudeCredentials{}, claudeCredentialLocation{}, false
 	}
 	// Claude Code reads the item under its account ($USER); by service
@@ -478,6 +481,9 @@ func saveClaudeCredential(loc claudeCredentialLocation, c claudeCredentials) err
 
 // claudeExecutable finds the claude CLI; a var so tests can fake it.
 var claudeExecutable = func() string {
+	if path, configured := configuredCLI("claude"); configured {
+		return path
+	}
 	if p, err := exec.LookPath("claude"); err == nil {
 		return p
 	}
@@ -489,6 +495,10 @@ var claudeExecutable = func() string {
 	}
 	return ""
 }
+
+// ClaudeExecutable is the configured or discovered Claude Code binary used
+// by the gateway's subscription bridge.
+func ClaudeExecutable() string { return claudeExecutable() }
 
 // claudeIdentity asks Claude Code itself which account is active. Its credential
 // blob intentionally contains tokens and plan metadata but no display identity;
@@ -543,7 +553,8 @@ func askClaudeStatus() (user, plan string, signedOut, ok bool) {
 	// --setting-sources), and then answers with no email; claudeSignedInUser
 	// names the account from ~/.claude.json instead (#177).
 	cmd := proc.CommandContext(ctx, path, "auth", "status", "--json")
-	cmd.Env = withoutClaudeWiring(os.Environ())
+	cmd.Dir = RuntimeHome("claude")
+	cmd.Env = RuntimeEnv("claude", withoutClaudeWiring(os.Environ()))
 	out, _ := cmd.Output()
 	var status struct {
 		LoggedIn         *bool  `json:"loggedIn"`
@@ -783,19 +794,14 @@ func claudeRefresh(ctx context.Context, c *claudeCredentials) error {
 // Accounts lists the signed-in agents as providers.
 func Accounts() []Provider {
 	rememberLogins(false)
-	home, _ := os.UserHomeDir()
-	cfg := os.Getenv("XDG_CONFIG_HOME")
-	if cfg == "" {
-		cfg = filepath.Join(home, ".config")
-	}
 	var out []Provider
 	if p, ok := claudeAccount(); ok {
 		out = append(out, p)
 	}
-	if p, ok := codexAccount(home); ok {
+	if p, ok := codexAccount(); ok {
 		out = append(out, p)
 	}
-	if p, ok := copilotAccount(cfg); ok {
+	if p, ok := copilotAccount(copilotConfigDir()); ok {
 		out = append(out, p)
 	}
 	if p, ok := cursorAccount(); ok {
@@ -904,8 +910,8 @@ type codexAuth struct {
 	} `json:"tokens"`
 }
 
-func codexAccount(home string) (Provider, bool) {
-	path := filepath.Join(home, ".codex", "auth.json")
+func codexAccount() (Provider, bool) {
+	path := codexAuthPath()
 	var a codexAuth
 	if !readJSON(path, &a) || a.Tokens.AccessToken == "" || a.AuthMode == "apikey" {
 		return Provider{}, false

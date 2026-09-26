@@ -91,6 +91,25 @@ func TestSignInInstallFails(t *testing.T) {
 	}
 }
 
+func TestSignInDoesNotInstallWhenDisabled(t *testing.T) {
+	t.Setenv(cliAutoInstallEnv, "false")
+	oldExe, oldInstaller := DevinExecutable, runInstaller
+	DevinExecutable = func() string { return "" }
+	ran := false
+	runInstaller = func(context.Context, agentCLI) ([]byte, error) {
+		ran = true
+		return nil, nil
+	}
+	t.Cleanup(func() { DevinExecutable, runInstaller = oldExe, oldInstaller })
+
+	if _, err := StartSignIn("devin"); err == nil || !strings.Contains(err.Error(), cliAutoInstallEnv) {
+		t.Fatalf("expected disabled installer error, got %v", err)
+	}
+	if ran {
+		t.Fatal("installer ran while disabled")
+	}
+}
+
 // canceled while installing: the sign-in never starts
 func TestSignInCanceledWhileInstalling(t *testing.T) {
 	claudeHome(t)

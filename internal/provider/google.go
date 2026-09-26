@@ -127,8 +127,7 @@ type googleAccount struct {
 
 // geminiDir is where Gemini CLI keeps its sign-in.
 func geminiDir() string {
-	home, _ := os.UserHomeDir()
-	return filepath.Join(home, ".gemini")
+	return filepath.Join(RuntimeHome("gemini"), ".gemini")
 }
 
 // geminiOwnLogin reads Gemini CLI's own Google sign-in. One another app's

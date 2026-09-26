@@ -35,7 +35,6 @@ import (
 	"io"
 	"net/http"
 	"net/url"
-	"os"
 	"path/filepath"
 	"runtime"
 	"strconv"
@@ -165,7 +164,7 @@ type wbAccount struct {
 // as its file-authentication-storage does: <shared data>/auth/<id>.info.
 // Both builds share the folder, each with its own file.
 func wbAuthPath(w *wbSite) string {
-	home, _ := os.UserHomeDir()
+	home := RuntimeHome("workbuddy")
 	var base string
 	switch runtime.GOOS {
 	case "darwin":
