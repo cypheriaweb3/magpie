@@ -20,10 +20,13 @@ import (
 
 // copilotConfigDir is where the Copilot editors keep their sign-in.
 func copilotConfigDir() string {
+	if runtimeHomeConfigured("copilot") {
+		return filepath.Join(RuntimeHome("copilot"), ".config")
+	}
 	if cfg := os.Getenv("XDG_CONFIG_HOME"); cfg != "" {
 		return cfg
 	}
-	home, _ := os.UserHomeDir()
+	home := RuntimeHome("copilot")
 	return filepath.Join(home, ".config")
 }
 

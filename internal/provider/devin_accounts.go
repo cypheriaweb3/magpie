@@ -34,14 +34,16 @@ func devinCredentialsAt(home string) string {
 }
 
 // devinCommand runs the devin CLI for an account: the CLI's own for home
-// "", else with magpie's home as its data folder.
+// "", else with magpie's home as its data folder. Either way it runs in the
+// configured runtime home, when one is set.
 func devinCommand(ctx context.Context, home, path string, args ...string) *exec.Cmd {
 	if home == "" {
-		return agentCommand(ctx, path, args...)
+		return agentCommand(ctx, "devin", path, args...)
 	}
 	cmd := proc.CommandContext(ctx, path, args...)
+	cmd.Dir = RuntimeHome("devin")
 	var env []string
-	for _, e := range os.Environ() {
+	for _, e := range RuntimeEnv("devin", os.Environ()) {
 		k, _, _ := strings.Cut(e, "=")
 		switch strings.ToUpper(k) {
 		case "XDG_DATA_HOME", "APPDATA":

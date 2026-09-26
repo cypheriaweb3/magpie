@@ -45,7 +45,7 @@ func sessionRoutes(mux *http.ServeMux, w Windows) {
 		for _, a := range agent.Clients() {
 			agents[a.ID] = a
 		}
-		out := sessionsJSON{Sessions: []sessionJSON{}, Terminal: runtime.GOOS == "darwin" && !isWeb(w),
+		out := sessionsJSON{Sessions: []sessionJSON{}, Terminal: runtime.GOOS == "darwin" && !isRemote(w),
 			Dirs: []string{}}
 		for _, d := range sessions.Dirs() {
 			out.Dirs = append(out.Dirs, tilde(d))
@@ -137,7 +137,7 @@ func sessionRoutes(mux *http.ServeMux, w Windows) {
 			fail(rw, err)
 			return
 		}
-		if runtime.GOOS != "darwin" || isWeb(w) {
+		if runtime.GOOS != "darwin" || isRemote(w) {
 			fail(rw, errors.New("opening Terminal is only for the Mac app"))
 			return
 		}

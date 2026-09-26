@@ -769,9 +769,16 @@ func keyNote() string {
 	return "(anything works; the gateway only listens on localhost)"
 }
 
-// serve: `magpie serve` — the gateway alone, in the foreground.
+// serve: `magpie serve` — the gateway, plus the optional admin API, in the foreground.
 func serve() error {
+	if err := provider.ValidateRuntime(); err != nil {
+		return err
+	}
 	s := gateway.New()
+	admin, err := prepareAdmin(s)
+	if err != nil {
+		return err
+	}
 	go stats.Run(version, "serve")
 	go catalog.KeepFresh() // new models' prices, in a gateway left running
 	fmt.Println(green.Render("●"), "magpie gateway on", bold.Render(gateway.URL()))
@@ -789,7 +796,12 @@ func serve() error {
 			fmt.Println(amber.Render("!"), x.Agent+":", x.Why)
 		}
 	}
-	return s.ListenAndServe(context.Background())
+	if admin != nil {
+		fmt.Println(green.Render("●"), "magpie admin on", bold.Render("http://"+admin.Address()))
+		fmt.Println(muted.Render("  OpenAPI "), "http://"+admin.Address()+"/openapi.json")
+	}
+
+	return serveGatewayAndAdmin(context.Background(), s.ListenAndServe, admin)
 }
 
 // importCmd adds the provider a magpie://import link describes, after

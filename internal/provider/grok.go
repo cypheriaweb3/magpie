@@ -31,7 +31,10 @@ import (
 
 // GrokExecutable finds the Grok Build CLI; a var so tests can fake it.
 var GrokExecutable = func() string {
-	home, _ := os.UserHomeDir()
+	if path, configured := configuredCLI("grok"); configured {
+		return path
+	}
+	home := RuntimeHome("grok")
 	path := append(filepath.SplitList(os.Getenv("PATH")), registryPath()...)
 	for _, c := range grokCandidates(runtime.GOOS, home, GrokHome(), os.Getenv("GROK_BIN_DIR"), path) {
 		if isFile(c.path) && (c.own || isGrokBuild(c.path)) {
@@ -109,10 +112,13 @@ func isGrokBuild(path string) bool {
 
 // GrokHome is where the CLI keeps its sign-in and settings.
 func GrokHome() string {
+	if runtimeHomeConfigured("grok") {
+		return filepath.Join(RuntimeHome("grok"), ".grok")
+	}
 	if h := os.Getenv("GROK_HOME"); h != "" {
 		return h
 	}
-	home, _ := os.UserHomeDir()
+	home := RuntimeHome("grok")
 	return filepath.Join(home, ".grok")
 }
 
@@ -391,7 +397,7 @@ func grokAccessToken(home, binary string, expired bool) (grokCredential, error) 
 		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 		cmd := proc.CommandContext(ctx, binary, "models")
 		cmd.Dir = filepath.Dir(home)
-		cmd.Env = netproxy.Env(grokOwnEnv(os.Environ(), home))
+		cmd.Env = netproxy.Env(grokOwnEnv(RuntimeEnv("grok", os.Environ()), home))
 		_ = cmd.Run()
 		cancel()
 		grokRefresh.Unlock()
@@ -435,7 +441,7 @@ func startGrokSignIn(s *signInFlow) error {
 		return errorf("install Grok Build first: %s", manual)
 	}
 	if _, ok := readGrokCredential(GrokHome()); !ok {
-		return runCLISignIn(s, "grok login", nil, true, nil, func() (string, string, bool) {
+		return runCLISignIn(s, "grok login", RuntimeEnv("grok", nil), true, nil, func() (string, string, bool) {
 			c, ok := readGrokCredential(GrokHome())
 			return c.Email, "", ok
 		}, nil, path, "login", "--device-auth")
@@ -454,10 +460,11 @@ func startGrokSignIn(s *signInFlow) error {
 	return err
 }
 
-// agentCommand runs an agent's CLI with magpie's proxy.
-func agentCommand(ctx context.Context, path string, args ...string) *exec.Cmd {
+// agentCommand runs an agent's CLI with magpie's proxy and isolated home.
+func agentCommand(ctx context.Context, agent, path string, args ...string) *exec.Cmd {
 	cmd := proc.CommandContext(ctx, path, args...)
-	cmd.Env = netproxy.Env(nil)
+	cmd.Dir = RuntimeHome(agent)
+	cmd.Env = netproxy.Env(RuntimeEnv(agent, nil))
 	return cmd
 }
 
@@ -471,7 +478,7 @@ func agentCommand(ctx context.Context, path string, args ...string) *exec.Cmd {
 func runCLISignIn(s *signInFlow, what string, env []string, using bool, failed func(), identity func() (user, plan string, ok bool), whole func(link string) bool, path string, args ...string) error {
 	ctx, cancel := context.WithCancel(context.Background())
 	cmd := proc.CommandContext(ctx, path, args...)
-	cmd.Dir, _ = os.UserHomeDir()
+	cmd.Dir = RuntimeHome(s.st.Agent)
 	cmd.Env = netproxy.Env(env)
 	out, err := cmd.StdoutPipe()
 	if err != nil {

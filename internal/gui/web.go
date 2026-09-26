@@ -190,3 +190,11 @@ func LANAddrs() []string {
 
 // isWeb: the page is served to a browser by `magpie web`.
 func isWeb(w Windows) bool { _, ok := w.(webHost); return ok }
+
+// isRemote: the page's user is not at this machine's screen, as in `magpie
+// web` or a host that says so (the admin API of `magpie serve`), so nothing
+// is opened here for them.
+func isRemote(w Windows) bool {
+	r, ok := w.(interface{ Remote() bool })
+	return isWeb(w) || ok && r.Remote()
+}

@@ -24,7 +24,7 @@ func omarchyTheme() (omarchy.Theme, bool) {
 // barIcon is whether magpie can put its icon in Omarchy's bar (the desktop
 // app on Omarchy's Hyprland; not a browser's page), and whether it has.
 func barIcon(w Windows) map[string]bool {
-	ok := onOmarchy && !isWeb(w) && omarchy.Hyprland()
+	ok := onOmarchy && !isRemote(w) && omarchy.Hyprland()
 	return map[string]bool{"available": ok, "on": ok && omarchy.WidgetOn()}
 }
 

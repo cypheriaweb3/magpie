@@ -27,10 +27,13 @@ import (
 
 // DevinExecutable finds the devin CLI; a var so tests can fake it.
 var DevinExecutable = func() string {
+	if path, configured := configuredCLI("devin"); configured {
+		return path
+	}
 	if p, err := exec.LookPath("devin"); err == nil {
 		return p
 	}
-	home, _ := os.UserHomeDir()
+	home := RuntimeHome("devin")
 	for _, p := range []string{filepath.Join(home, ".local", "bin", "devin"), "/usr/local/bin/devin", "/opt/homebrew/bin/devin"} {
 		if st, err := os.Stat(p); err == nil && !st.IsDir() {
 			return p
@@ -41,6 +44,13 @@ var DevinExecutable = func() string {
 
 // DevinCredentialsPath is where the CLI keeps its sign-in.
 func DevinCredentialsPath() string {
+	if runtimeHomeConfigured("devin") {
+		home := RuntimeHome("devin")
+		if runtime.GOOS == "windows" {
+			return filepath.Join(home, "AppData", "Roaming", "devin", "credentials.toml")
+		}
+		return filepath.Join(home, ".local", "share", "devin", "credentials.toml")
+	}
 	if runtime.GOOS == "windows" {
 		if app := os.Getenv("APPDATA"); app != "" {
 			return filepath.Join(app, "devin", "credentials.toml")
@@ -48,7 +58,7 @@ func DevinCredentialsPath() string {
 	}
 	base := os.Getenv("XDG_DATA_HOME")
 	if base == "" {
-		home, _ := os.UserHomeDir()
+		home := RuntimeHome("devin")
 		base = filepath.Join(home, ".local", "share")
 	}
 	return filepath.Join(base, "devin", "credentials.toml")

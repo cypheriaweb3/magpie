@@ -90,7 +90,10 @@ func codexVersion() string {
 		}
 		if exe := codexExecutable(); exe != "" {
 			ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-			if out, err := proc.CommandContext(ctx, exe, "--version").Output(); err == nil {
+			cmd := proc.CommandContext(ctx, exe, "--version")
+			cmd.Dir = RuntimeHome("codex")
+			cmd.Env = RuntimeEnv("codex", nil)
+			if out, err := cmd.Output(); err == nil {
 				newer(string(out)) // "codex-cli 0.155.1"
 			}
 			cancel()
@@ -102,11 +105,13 @@ func codexVersion() string {
 
 // codexCLIHome is where Codex CLI keeps its state: CODEX_HOME, else ~/.codex.
 func codexCLIHome() string {
+	if runtimeHomeConfigured("codex") {
+		return filepath.Dir(codexAuthPath())
+	}
 	if dir := os.Getenv("CODEX_HOME"); dir != "" {
 		return dir
 	}
-	home, _ := os.UserHomeDir()
-	return filepath.Join(home, ".codex")
+	return filepath.Dir(codexAuthPath())
 }
 
 // newerVersion is the later of two versions, a when b isn't one.
@@ -170,6 +175,9 @@ func SawCodexClient(h http.Header) {
 // PATH it looks where npm, nvm, bun, volta, pnpm, mise and the standalone
 // installer put it, which a desktop app's PATH lacks.
 var codexExecutable = func() string {
+	if path, configured := configuredCLI("codex"); configured {
+		return path
+	}
 	if p, err := exec.LookPath("codex"); err == nil {
 		return p
 	}
