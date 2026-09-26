@@ -44,10 +44,13 @@ type copilotCLIUser struct {
 
 // copilotCLIHome is where the CLI keeps its settings.
 func copilotCLIHome() string {
+	if runtimeHomeConfigured("copilot") {
+		return filepath.Join(RuntimeHome("copilot"), ".copilot")
+	}
 	if h := os.Getenv("COPILOT_HOME"); h != "" {
 		return h
 	}
-	home, _ := os.UserHomeDir()
+	home := RuntimeHome("copilot")
 	return filepath.Join(home, ".copilot")
 }
 
@@ -95,6 +98,9 @@ var copilotSecrets struct {
 // copilotCLISecret reads the CLI's token from the keychain, once in a
 // while: each read may ask the user to allow it.
 var copilotCLISecret = func(account string) string {
+	if runtimeHomeConfigured("copilot") {
+		return ""
+	}
 	c := &copilotSecrets
 	c.Lock()
 	defer c.Unlock()

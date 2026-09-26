@@ -81,16 +81,18 @@ func codexVersion() string {
 			v = c
 		}
 	}
-	home, _ := os.UserHomeDir()
 	var c struct {
 		ClientVersion string `json:"client_version"`
 	}
-	if b, err := os.ReadFile(filepath.Join(home, ".codex", "models_cache.json")); err == nil && json.Unmarshal(b, &c) == nil {
+	if b, err := os.ReadFile(filepath.Join(filepath.Dir(codexAuthPath()), "models_cache.json")); err == nil && json.Unmarshal(b, &c) == nil {
 		newer(c.ClientVersion)
 	}
 	if exe := codexExecutable(); exe != "" {
 		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-		if out, err := proc.CommandContext(ctx, exe, "--version").Output(); err == nil {
+		cmd := proc.CommandContext(ctx, exe, "--version")
+		cmd.Dir = RuntimeHome("codex")
+		cmd.Env = RuntimeEnv("codex", nil)
+		if out, err := cmd.Output(); err == nil {
 			newer(string(out)) // "codex-cli 0.155.1"
 		}
 		cancel()
@@ -101,10 +103,13 @@ func codexVersion() string {
 
 // codexExecutable finds the codex CLI; a var so tests can fake it.
 var codexExecutable = func() string {
+	if path, configured := configuredCLI("codex"); configured {
+		return path
+	}
 	if p, err := exec.LookPath("codex"); err == nil {
 		return p
 	}
-	home, _ := os.UserHomeDir()
+	home := RuntimeHome("codex")
 	for _, p := range []string{filepath.Join(home, ".local", "bin", "codex"), "/opt/homebrew/bin/codex", "/usr/local/bin/codex"} {
 		if st, err := os.Stat(p); err == nil && !st.IsDir() {
 			return p

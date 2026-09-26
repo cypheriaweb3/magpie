@@ -196,10 +196,69 @@ Assist Standard and Enterprise, which need a Google Cloud project named
 Antigravity account it sees used outside Antigravity, so magpie asks before
 adding one; use an account you can afford to lose.
 
+#### The ten subscription providers
+
+| Provider | Login Magpie uses by default | How requests are served | Managed runtime overrides | Automatic CLI install |
+| --- | --- | --- | --- | --- |
+| Claude | Claude Code's macOS Keychain item or `~/.claude/.credentials.json` | The configured or discovered `claude` CLI; it is required for subscription generations | `MAGPIE_CLAUDE_HOME`, `MAGPIE_CLAUDE_CLI` | Never |
+| Codex | `~/.codex/auth.json` | ChatGPT's Codex API directly; the `codex` CLI is optional and supplies its installed version | `MAGPIE_CODEX_HOME`, `MAGPIE_CODEX_CLI` | Never |
+| Copilot | `~/.config/github-copilot/{apps,hosts}.json`, or the standalone CLI's `~/.copilot/config.json` and keychain token | GitHub Copilot directly; Magpie does not execute the `copilot` CLI | `MAGPIE_COPILOT_HOME` | Never |
+| Cursor | The macOS Keychain or Cursor's platform `auth.json` | Cursor's agent API directly with the CLI's sign-in; the `cursor-agent` CLI supplies identity, models, its client version and token renewal | `MAGPIE_CURSOR_HOME`, `MAGPIE_CURSOR_CLI` | On `/api/signin` only, unless disabled |
+| Devin | `~/.local/share/devin/credentials.toml`, or `%APPDATA%\devin\credentials.toml` | Devin's API directly with the CLI's sign-in; the `devin` CLI supplies identity and models | `MAGPIE_DEVIN_HOME`, `MAGPIE_DEVIN_CLI` | On `/api/signin` only, unless disabled |
+| Gemini | Gemini CLI's `~/.gemini/oauth_creds.json` | Google Code Assist directly; no Gemini CLI process is required | `MAGPIE_GEMINI_HOME` | Never |
+| Antigravity | Accounts added by Magpie and saved in Magpie's own `logins.json`; Magpie does not read Antigravity's application state | Google Code Assist directly | No external home or CLI is read | Never |
+| Grok | `~/.grok/auth.json` | Grok's Responses API directly with the CLI's sign-in; the `grok` CLI renews that sign-in and supplies its version | `MAGPIE_GROK_HOME`, `MAGPIE_GROK_CLI` | On `/api/signin` only, unless disabled |
+| Kiro | kiro-cli's `data.sqlite3` in its platform data directory, or the Kiro IDE's `~/.aws/sso/cache`; a Kiro API key may be saved on the provider instead | Kiro's API directly; the `kiro-cli` CLI is optional and refreshes its own sign-in | `MAGPIE_KIRO_HOME`, `MAGPIE_KIRO_CLI` | Never |
+| ZCode | `~/.zcode/v2/credentials.json`; `ZCODE_CREDENTIAL_SECRET` may provide its decryption seed | Z.ai's API directly; no ZCode CLI process is required | `MAGPIE_ZCODE_HOME` | Never |
+
+Each `MAGPIE_<PROVIDER>_HOME` is an absolute virtual user home, not the
+provider's final configuration directory. Magpie applies the provider's normal
+layout below it, for example:
+
+```text
+$MAGPIE_CLAUDE_HOME/.claude/.credentials.json
+$MAGPIE_CODEX_HOME/.codex/auth.json
+$MAGPIE_CURSOR_HOME/.cursor/auth.json             # macOS
+$MAGPIE_DEVIN_HOME/.local/share/devin/credentials.toml
+$MAGPIE_GEMINI_HOME/.gemini/oauth_creds.json
+$MAGPIE_GROK_HOME/.grok/auth.json
+$MAGPIE_KIRO_HOME/Library/Application Support/kiro-cli/data.sqlite3  # macOS
+$MAGPIE_KIRO_HOME/.aws/sso/cache/kiro-auth-token.json
+$MAGPIE_ZCODE_HOME/.zcode/v2/credentials.json
+```
+
+When a provider home is set, Magpie does not fall back to that provider's
+files or keychain entries in the real user home. CLI subprocesses receive a
+matching isolated `HOME`, `XDG_*` or Windows application-data environment.
+These variables do not relocate Magpie's own settings and `logins.json`.
+
+`MAGPIE_<PROVIDER>_CLI` must be an absolute path. Once set, Magpie uses only
+that file and does not search `PATH`, `~/.local/bin`, `/usr/local/bin` or
+Homebrew. `magpie serve` rejects an empty, relative or missing configured CLI
+and an empty or relative configured home before opening either listener.
+
+Cursor, Devin and Grok preserve their existing convenience of installing a
+missing CLI when a new sign-in starts. A managed process can prohibit every
+such installer with:
+
+```sh
+MAGPIE_CLI_AUTO_INSTALL=false magpie serve
+```
+
+With installation disabled, `/api/signin` fails immediately when its required
+CLI is missing; no shell, PowerShell or vendor installer is run. An explicit
+but invalid `MAGPIE_<PROVIDER>_CLI` is never replaced by an automatic install.
+Runtime overrides are fixed for the life of the process; restart `magpie
+serve` after changing them. One process accepts one home and one CLI per
+provider. Separate Magpie processes are required for multiple simultaneous
+homes of the same provider. When none of these Magpie variables is set, the
+existing provider variables and Magpie's normal home, keychain and `PATH`
+discovery keep their upstream behavior.
+
 ### Connecting anything else
 
 The gateway listens on `127.0.0.1:3425` (`MAGPIE_ADDR` changes it) and starts
-with the app; `magpie serve` runs it alone. It exposes:
+with the app; `magpie serve` runs it in the foreground. It exposes:
 
 | Path                     | API                        |
 | ------------------------ | -------------------------- |
@@ -229,6 +288,35 @@ it:
 The *Gateway* tab in the app has this as copy buttons and ready-made
 snippets (shell, curl, Python, Node) for each API, the list of model ids,
 and the recent calls; `MAGPIE_DEBUG=1` logs every call to the terminal.
+
+#### Admin API
+
+A GUI-capable build can expose the desktop app's existing configuration API
+from `magpie serve`, alongside the gateway. Both variables are required; with
+neither set, `serve` behaves as before, and a partial configuration is refused:
+
+```sh
+MAGPIE_ADMIN_ADDR=127.0.0.1:3430 \
+MAGPIE_ADMIN_TOKEN='replace-with-a-long-random-token' \
+magpie serve
+
+curl -H 'Authorization: Bearer replace-with-a-long-random-token' \
+  http://127.0.0.1:3430/api/state
+```
+
+The OpenAPI 3.1 document is at `/openapi.json` on the admin address and uses
+the same bearer authentication. The admin server has no CORS policy. Native
+applications should call it from their backend or main process and perform
+browser, clipboard, file-manager and window actions themselves; in particular,
+open the URL returned by `/api/signin` on the user's machine.
+
+The authenticated handler also serves Magpie's embedded GUI assets, but using
+them as a remote GUI is not a supported contract.
+
+`MAGPIE_ADMIN_ADDR` may name a non-loopback interface. The admin server is
+plain HTTP and exposes provider keys and other sensitive configuration, so put
+TLS termination, access controls and a firewall in front of it whenever it
+leaves a trusted host. The `nogui` build does not include the admin API.
 
 **Claude Code** gets `ANTHROPIC_BASE_URL`, `ANTHROPIC_AUTH_TOKEN` and the
 model variables in the `env` block of `settings.json`; picking a native

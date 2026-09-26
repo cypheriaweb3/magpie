@@ -38,10 +38,13 @@ import (
 // tests can fake it. The installer puts it in ~/.local/bin, and on macOS
 // inside Kiro CLI.app as well.
 var KiroExecutable = func() string {
+	if path, configured := configuredCLI("kiro"); configured {
+		return path
+	}
 	if p, err := exec.LookPath("kiro-cli"); err == nil {
 		return p
 	}
-	home, _ := os.UserHomeDir()
+	home := RuntimeHome("kiro")
 	for _, p := range []string{filepath.Join(home, ".local", "bin", "kiro-cli"),
 		"/Applications/Kiro CLI.app/Contents/MacOS/kiro-cli", "/usr/local/bin/kiro-cli", "/opt/homebrew/bin/kiro-cli"} {
 		if st, err := os.Stat(p); err == nil && !st.IsDir() {
@@ -53,12 +56,14 @@ var KiroExecutable = func() string {
 
 // kiroCLIDB is kiro-cli's database, where its sign-in is kept; a var so
 // tests can point it elsewhere.
-var kiroCLIDB = func() string {
-	home, _ := os.UserHomeDir()
+var kiroCLIDB = defaultKiroCLIDB
+
+func defaultKiroCLIDB() string {
+	home := RuntimeHome("kiro")
 	switch runtime.GOOS {
 	case "windows":
 		dir := os.Getenv("APPDATA")
-		if dir == "" {
+		if dir == "" || runtimeHomeConfigured("kiro") {
 			dir = filepath.Join(home, "AppData", "Roaming")
 		}
 		return filepath.Join(dir, "kiro-cli", "data.sqlite3")
@@ -69,8 +74,10 @@ var kiroCLIDB = func() string {
 }
 
 // kiroIDEDir is where the Kiro IDE keeps its sign-in.
-var kiroIDEDir = func() string {
-	home, _ := os.UserHomeDir()
+var kiroIDEDir = defaultKiroIDEDir
+
+func defaultKiroIDEDir() string {
+	home := RuntimeHome("kiro")
 	return filepath.Join(home, ".aws", "sso", "cache")
 }
 
@@ -319,6 +326,8 @@ func refreshKiro(ctx context.Context, c kiroCred) (kiroCred, error) {
 		if bin := KiroExecutable(); bin != "" {
 			rctx, cancel := context.WithTimeout(ctx, 20*time.Second)
 			cmd := proc.CommandContext(rctx, bin, "debug", "refresh-auth-token")
+			cmd.Dir = RuntimeHome("kiro")
+			cmd.Env = RuntimeEnv("kiro", nil)
 			_ = cmd.Run()
 			cancel()
 			if n, ok := readKiroCLI(); ok && n.dbKey == c.dbKey && n.access != c.access && n.fresh() {

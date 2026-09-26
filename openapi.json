@@ -1,0 +1,696 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "Magpie Admin API",
+    "version": "unversioned",
+    "description": "The authenticated administration surface exposed only by a GUI-capable `magpie serve` when MAGPIE_ADMIN_ADDR and MAGPIE_ADMIN_TOKEN are set. It mirrors Magpie's existing desktop handler. Desktop actions are client-owned in server mode."
+  },
+  "servers": [{ "url": "/" }],
+  "security": [{ "bearerAuth": [] }],
+  "tags": [
+    { "name": "State" },
+    { "name": "Providers" },
+    { "name": "Accounts" },
+    { "name": "Groups" },
+    { "name": "Library" },
+    { "name": "Usage" },
+    { "name": "Backup" },
+    { "name": "Sessions" },
+    { "name": "Settings" },
+    { "name": "Host", "description": "Desktop-host conveniences. The calling application owns these actions in server mode." },
+    { "name": "Update" }
+  ],
+  "paths": {
+    "/openapi.json": {
+      "get": {
+        "operationId": "getOpenAPI",
+        "summary": "Get this OpenAPI document",
+        "tags": ["State"],
+        "responses": {
+          "200": { "description": "OpenAPI 3.1 JSON", "content": { "application/json": { "schema": { "type": "object" } } } },
+          "401": { "$ref": "#/components/responses/Unauthorized" }
+        }
+      }
+    },
+    "/api/state": {
+      "get": {
+        "operationId": "getState",
+        "summary": "Get detected agents, profiles, catalog source and settings",
+        "tags": ["State"],
+        "responses": { "200": { "$ref": "#/components/responses/State" }, "401": { "$ref": "#/components/responses/Unauthorized" } }
+      }
+    },
+    "/api/set": {
+      "post": {
+        "operationId": "setAgentField",
+        "summary": "Set a detected agent field",
+        "tags": ["State"],
+        "requestBody": { "required": true, "content": { "application/json": { "schema": { "$ref": "#/components/schemas/AgentFieldChange" } } } },
+        "responses": { "200": { "$ref": "#/components/responses/State" }, "400": { "$ref": "#/components/responses/BadRequest" }, "401": { "$ref": "#/components/responses/Unauthorized" } }
+      }
+    },
+    "/api/drift": {
+      "get": {
+        "operationId": "getAgentDrift",
+        "summary": "Get externally changed agent configurations",
+        "tags": ["State"],
+        "responses": { "200": { "$ref": "#/components/responses/JSONObject" }, "401": { "$ref": "#/components/responses/Unauthorized" } }
+      }
+    },
+    "/api/agents/{action}/{id}": {
+      "post": {
+        "operationId": "resolveAgentDrift",
+        "summary": "Reapply Magpie's configuration or keep the agent's current value",
+        "tags": ["State"],
+        "parameters": [
+          { "name": "action", "in": "path", "required": true, "schema": { "type": "string", "enum": ["reapply", "keep"] } },
+          { "name": "id", "in": "path", "required": true, "schema": { "type": "string" } }
+        ],
+        "responses": { "200": { "$ref": "#/components/responses/State" }, "400": { "$ref": "#/components/responses/BadRequest" }, "401": { "$ref": "#/components/responses/Unauthorized" }, "404": { "$ref": "#/components/responses/NotFound" } }
+      }
+    },
+    "/api/agents/arrange": {
+      "post": {
+        "operationId": "arrangeAgents",
+        "summary": "Save agent order and collapsed sections",
+        "tags": ["Settings"],
+        "requestBody": { "required": true, "content": { "application/json": { "schema": { "$ref": "#/components/schemas/AgentArrangement" } } } },
+        "responses": { "200": { "$ref": "#/components/responses/SettingsState" }, "400": { "$ref": "#/components/responses/BadRequest" }, "401": { "$ref": "#/components/responses/Unauthorized" } }
+      }
+    },
+    "/api/profile/{action}": {
+      "post": {
+        "operationId": "changeProfile",
+        "summary": "Save, apply or delete a profile",
+        "tags": ["State"],
+        "parameters": [{ "name": "action", "in": "path", "required": true, "schema": { "type": "string", "enum": ["save", "use", "delete"] } }],
+        "requestBody": { "required": true, "content": { "application/json": { "schema": { "$ref": "#/components/schemas/NameRequest" } } } },
+        "responses": { "200": { "$ref": "#/components/responses/JSONObject" }, "400": { "$ref": "#/components/responses/BadRequest" }, "401": { "$ref": "#/components/responses/Unauthorized" }, "404": { "$ref": "#/components/responses/NotFound" } }
+      }
+    },
+    "/api/sync": {
+      "post": {
+        "operationId": "syncCatalog",
+        "summary": "Refresh the catalog and ready providers' live model lists",
+        "tags": ["State"],
+        "responses": { "200": { "$ref": "#/components/responses/State" }, "400": { "$ref": "#/components/responses/BadRequest" }, "401": { "$ref": "#/components/responses/Unauthorized" } }
+      }
+    },
+    "/api/settings": {
+      "get": {
+        "operationId": "getSettings",
+        "summary": "Get settings and runtime paths",
+        "tags": ["Settings"],
+        "responses": { "200": { "$ref": "#/components/responses/SettingsState" }, "401": { "$ref": "#/components/responses/Unauthorized" } }
+      },
+      "post": {
+        "operationId": "saveSettings",
+        "summary": "Replace editable settings",
+        "description": "Agent arrangement and window geometry are retained from the current settings.",
+        "tags": ["Settings"],
+        "requestBody": { "required": true, "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Settings" } } } },
+        "responses": { "200": { "$ref": "#/components/responses/SettingsState" }, "400": { "$ref": "#/components/responses/BadRequest" }, "401": { "$ref": "#/components/responses/Unauthorized" } }
+      }
+    },
+    "/api/settings/login": {
+      "post": {
+        "operationId": "setOpenAtLogin",
+        "summary": "Enable or disable opening Magpie at login",
+        "description": "Changes the autostart entry of the machine Magpie runs on.",
+        "tags": ["Settings"],
+        "requestBody": { "required": true, "content": { "application/json": { "schema": { "type": "object", "required": ["on"], "properties": { "on": { "type": "boolean" } } } } } },
+        "responses": { "200": { "$ref": "#/components/responses/SettingsState" }, "400": { "$ref": "#/components/responses/BadRequest" }, "401": { "$ref": "#/components/responses/Unauthorized" } }
+      }
+    },
+    "/api/settings/lan": {
+      "post": {
+        "operationId": "setGatewayLAN",
+        "summary": "Share the gateway on the local network",
+        "description": "Turning sharing on creates a LAN key the first time; `newKey` replaces it, and the previous key stops working. The gateway listener is restarted.",
+        "tags": ["Settings"],
+        "requestBody": { "required": true, "content": { "application/json": { "schema": { "type": "object", "required": ["on"], "properties": { "on": { "type": "boolean" }, "newKey": { "type": "boolean" } } } } } },
+        "responses": { "200": { "$ref": "#/components/responses/SettingsState" }, "400": { "$ref": "#/components/responses/BadRequest" }, "401": { "$ref": "#/components/responses/Unauthorized" } }
+      }
+    },
+    "/api/settings/reveal": {
+      "post": {
+        "operationId": "revealSettings",
+        "summary": "Reveal the settings directory",
+        "description": "Unsupported in server mode. Read `dir` from GET /api/settings and let the calling application handle it.",
+        "tags": ["Host"],
+        "responses": { "400": { "$ref": "#/components/responses/HostUnavailable" }, "401": { "$ref": "#/components/responses/Unauthorized" } }
+      }
+    },
+    "/api/window/{action}": {
+      "post": {
+        "operationId": "windowAction",
+        "summary": "Perform a desktop window action",
+        "description": "No-op in server mode. The calling application owns its windows.",
+        "tags": ["Host"],
+        "parameters": [
+          { "name": "action", "in": "path", "required": true, "schema": { "type": "string", "enum": ["hide", "main", "quit", "fit", "tint"] } },
+          { "name": "view", "in": "query", "schema": { "type": "string" } },
+          { "name": "h", "in": "query", "schema": { "type": "integer" } },
+          { "name": "ease", "in": "query", "schema": { "type": "string", "description": "CSS cubic-bezier control points x1,y1,x2,y2" } },
+          { "name": "c", "in": "query", "schema": { "type": "string", "description": "RGBA bytes r,g,b,a" } },
+          { "name": "ms", "in": "query", "schema": { "type": "integer" } }
+        ],
+        "responses": { "204": { "description": "Accepted; no desktop action occurs in server mode" }, "401": { "$ref": "#/components/responses/Unauthorized" } }
+      }
+    },
+    "/api/providers": {
+      "get": {
+        "operationId": "getProviders",
+        "summary": "Get providers, presets, excluded sign-ins and gateway state",
+        "tags": ["Providers"],
+        "responses": { "200": { "$ref": "#/components/responses/ProviderState" }, "401": { "$ref": "#/components/responses/Unauthorized" } }
+      }
+    },
+    "/api/provider/{action}": {
+      "post": {
+        "operationId": "changeProvider",
+        "summary": "Create, edit, inspect, test or delete a provider",
+        "description": "The request shape depends on action. `save` accepts a Provider plus `new`, `from` and `clearBalanceToken`; the other actions principally require `id` and their relevant provider field.",
+        "tags": ["Providers"],
+        "parameters": [{ "name": "action", "in": "path", "required": true, "schema": { "type": "string", "enum": ["show", "save", "key", "route", "affinity", "delete", "test", "unfetch", "models"] } }],
+        "requestBody": { "required": true, "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ProviderActionRequest" } } } },
+        "responses": { "200": { "description": "Provider state, a revealed key, test results, or a refreshed model count depending on action", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ProviderActionResponse" } } } }, "400": { "$ref": "#/components/responses/BadRequest" }, "401": { "$ref": "#/components/responses/Unauthorized" }, "404": { "$ref": "#/components/responses/NotFound" } }
+      }
+    },
+    "/api/icons/favicon": {
+      "post": {
+        "operationId": "storeProviderFavicon",
+        "summary": "Store a site's favicon as a provider icon",
+        "description": "Finds the icon of the site at `url`, usually a provider's base URL, and stores it.",
+        "tags": ["Providers"],
+        "requestBody": { "required": true, "content": { "application/json": { "schema": { "$ref": "#/components/schemas/URLRequest" } } } },
+        "responses": { "200": { "description": "Stored icon reference", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/IconReference" } } } }, "400": { "$ref": "#/components/responses/BadRequest" }, "401": { "$ref": "#/components/responses/Unauthorized" } }
+      }
+    },
+    "/api/icons": {
+      "post": {
+        "operationId": "storeProviderIcon",
+        "summary": "Store a provider icon",
+        "description": "Accepts raw image bytes, or JSON whose `data` is base64. The maximum decoded icon size is enforced by Magpie.",
+        "tags": ["Providers"],
+        "requestBody": { "required": true, "content": { "application/octet-stream": { "schema": { "type": "string", "contentEncoding": "base64" } }, "application/json": { "schema": { "$ref": "#/components/schemas/Base64Data" } } } },
+        "responses": { "200": { "description": "Stored icon reference", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/IconReference" } } } }, "400": { "$ref": "#/components/responses/BadRequest" }, "401": { "$ref": "#/components/responses/Unauthorized" } }
+      }
+    },
+    "/api/icons/{name}": {
+      "get": {
+        "operationId": "getProviderIcon",
+        "summary": "Get a stored provider icon",
+        "tags": ["Providers"],
+        "parameters": [{ "name": "name", "in": "path", "required": true, "schema": { "type": "string" } }],
+        "responses": { "200": { "description": "Icon bytes", "content": { "image/png": { "schema": { "type": "string", "contentEncoding": "base64" } }, "image/jpeg": { "schema": { "type": "string", "contentEncoding": "base64" } }, "image/svg+xml": { "schema": { "type": "string" } } } }, "401": { "$ref": "#/components/responses/Unauthorized" }, "404": { "$ref": "#/components/responses/NotFound" } }
+      }
+    },
+    "/api/importapps": {
+      "get": {
+        "operationId": "getImportableApps",
+        "summary": "List providers importable from installed applications",
+        "tags": ["Providers"],
+        "responses": { "200": { "$ref": "#/components/responses/JSONArray" }, "401": { "$ref": "#/components/responses/Unauthorized" } }
+      },
+      "post": {
+        "operationId": "importFromApps",
+        "summary": "Import selected providers from installed applications",
+        "tags": ["Providers"],
+        "requestBody": { "required": true, "content": { "application/json": { "schema": { "type": "object", "required": ["picks"], "properties": { "picks": { "type": "array", "items": { "type": "object", "additionalProperties": true } } } } } } },
+        "responses": { "200": { "$ref": "#/components/responses/JSONObject" }, "400": { "$ref": "#/components/responses/BadRequest" }, "401": { "$ref": "#/components/responses/Unauthorized" } }
+      }
+    },
+    "/api/import/{id}": {
+      "get": {
+        "operationId": "consumeStashedImport",
+        "summary": "Consume a one-time import previously stashed by the desktop application",
+        "description": "The admin API does not add a route for stashing new magpie:// links.",
+        "tags": ["Providers"],
+        "parameters": [{ "name": "id", "in": "path", "required": true, "schema": { "type": "string" } }],
+        "responses": { "200": { "$ref": "#/components/responses/JSONObject" }, "401": { "$ref": "#/components/responses/Unauthorized" }, "404": { "$ref": "#/components/responses/NotFound" } }
+      }
+    },
+    "/api/import/icon": {
+      "post": {
+        "operationId": "fetchImportIcon",
+        "summary": "Fetch and store an icon referenced by an import",
+        "tags": ["Providers"],
+        "requestBody": { "required": true, "content": { "application/json": { "schema": { "$ref": "#/components/schemas/URLRequest" } } } },
+        "responses": { "200": { "description": "Stored icon reference", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/IconReference" } } } }, "400": { "$ref": "#/components/responses/BadRequest" }, "401": { "$ref": "#/components/responses/Unauthorized" } }
+      }
+    },
+    "/api/login/usage": {
+      "get": {
+        "operationId": "getLoginUsage",
+        "summary": "Get subscription usage by account",
+        "tags": ["Accounts"],
+        "parameters": [{ "name": "agent", "in": "query", "schema": { "type": "string" } }],
+        "responses": { "200": { "$ref": "#/components/responses/JSONObject" }, "401": { "$ref": "#/components/responses/Unauthorized" } }
+      }
+    },
+    "/api/login/{action}": {
+      "post": {
+        "operationId": "changeLogin",
+        "summary": "Switch, forget, enable or disable a remembered account",
+        "tags": ["Accounts"],
+        "parameters": [{ "name": "action", "in": "path", "required": true, "schema": { "type": "string", "enum": ["switch", "forget", "on", "off"] } }],
+        "requestBody": { "required": true, "content": { "application/json": { "schema": { "$ref": "#/components/schemas/LoginChange" } } } },
+        "responses": { "200": { "$ref": "#/components/responses/ProviderState" }, "400": { "$ref": "#/components/responses/BadRequest" }, "401": { "$ref": "#/components/responses/Unauthorized" }, "404": { "$ref": "#/components/responses/NotFound" } }
+      }
+    },
+    "/api/keys/{action}": {
+      "post": {
+        "operationId": "changeProviderKey",
+        "summary": "Add, select, rename, configure, enable or remove a provider key",
+        "tags": ["Providers"],
+        "parameters": [{ "name": "action", "in": "path", "required": true, "schema": { "type": "string", "enum": ["add", "protocol", "use", "remove", "rename", "on", "off"] } }],
+        "requestBody": { "required": true, "content": { "application/json": { "schema": { "$ref": "#/components/schemas/KeyChange" } } } },
+        "responses": { "200": { "$ref": "#/components/responses/ProviderState" }, "400": { "$ref": "#/components/responses/BadRequest" }, "401": { "$ref": "#/components/responses/Unauthorized" }, "404": { "$ref": "#/components/responses/NotFound" } }
+      }
+    },
+    "/api/signin": {
+      "post": {
+        "operationId": "startSignIn",
+        "summary": "Start adding a subscription account",
+        "description": "The returned status contains the URL when available. Magpie does not open a browser in server mode; poll GET /api/signin/{id} while the state is `installing` or `waiting` and let the calling application open the URL. With MAGPIE_CLI_AUTO_INSTALL=false, a missing required CLI produces an immediate error and no installer is run.",
+        "tags": ["Accounts"],
+        "requestBody": { "required": true, "content": { "application/json": { "schema": { "type": "object", "required": ["agent"], "properties": { "agent": { "type": "string" } } } } } },
+        "responses": { "200": { "description": "Sign-in status", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/SignInStatus" } } } }, "400": { "$ref": "#/components/responses/BadRequest" }, "401": { "$ref": "#/components/responses/Unauthorized" } }
+      }
+    },
+    "/api/signin/{id}": {
+      "get": {
+        "operationId": "getSignIn",
+        "summary": "Poll a sign-in attempt",
+        "tags": ["Accounts"],
+        "parameters": [{ "name": "id", "in": "path", "required": true, "schema": { "type": "string" } }],
+        "responses": { "200": { "description": "Sign-in status", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/SignInStatus" } } } }, "401": { "$ref": "#/components/responses/Unauthorized" }, "404": { "$ref": "#/components/responses/NotFound" } }
+      }
+    },
+    "/api/signin/{id}/cancel": {
+      "post": {
+        "operationId": "cancelSignIn",
+        "summary": "Cancel a sign-in attempt",
+        "tags": ["Accounts"],
+        "parameters": [{ "name": "id", "in": "path", "required": true, "schema": { "type": "string" } }],
+        "responses": { "204": { "description": "Canceled" }, "401": { "$ref": "#/components/responses/Unauthorized" } }
+      }
+    },
+    "/api/groups": {
+      "get": {
+        "operationId": "getGroups",
+        "summary": "Get routing groups, model choices and account/key pools",
+        "tags": ["Groups"],
+        "responses": { "200": { "$ref": "#/components/responses/JSONObject" }, "401": { "$ref": "#/components/responses/Unauthorized" } }
+      }
+    },
+    "/api/groups/{action}": {
+      "post": {
+        "operationId": "changeGroup",
+        "summary": "Save, delete or restore a routing group",
+        "tags": ["Groups"],
+        "parameters": [{ "name": "action", "in": "path", "required": true, "schema": { "type": "string", "enum": ["save", "delete", "show"] } }],
+        "requestBody": { "required": true, "content": { "application/json": { "schema": { "$ref": "#/components/schemas/GroupChange" } } } },
+        "responses": { "200": { "$ref": "#/components/responses/JSONObject" }, "400": { "$ref": "#/components/responses/BadRequest" }, "401": { "$ref": "#/components/responses/Unauthorized" }, "404": { "$ref": "#/components/responses/NotFound" } }
+      }
+    },
+    "/api/gateway/trace": {
+      "get": {
+        "operationId": "getGatewayTrace",
+        "summary": "Get routing trace events",
+        "description": "When `wait` is non-empty the request waits for a change for up to 25 seconds.",
+        "tags": ["State"],
+        "parameters": [
+          { "name": "after", "in": "query", "schema": { "type": "integer", "format": "int64", "default": 0 } },
+          { "name": "wait", "in": "query", "schema": { "type": "string" } }
+        ],
+        "responses": { "200": { "$ref": "#/components/responses/JSONObject" }, "401": { "$ref": "#/components/responses/Unauthorized" } }
+      }
+    },
+    "/api/usage": {
+      "get": {
+        "operationId": "getUsage",
+        "summary": "Get locally recorded token and cost usage",
+        "tags": ["Usage"],
+        "parameters": [{ "name": "period", "in": "query", "schema": { "type": "string", "enum": ["today", "7d", "30d", "all"], "default": "30d" } }],
+        "responses": { "200": { "$ref": "#/components/responses/JSONObject" }, "401": { "$ref": "#/components/responses/Unauthorized" } }
+      }
+    },
+    "/api/usage/quotas": {
+      "get": {
+        "operationId": "getQuotas",
+        "summary": "Get subscription, plan and key allowance data",
+        "tags": ["Usage"],
+        "responses": { "200": { "$ref": "#/components/responses/JSONArray" }, "401": { "$ref": "#/components/responses/Unauthorized" } }
+      }
+    },
+    "/api/backup/export": {
+      "post": {
+        "operationId": "exportBackup",
+        "summary": "Write an encrypted backup to the server's Downloads directory",
+        "description": "The response contains the resulting path. No file manager is opened in server mode.",
+        "tags": ["Backup"],
+        "requestBody": { "required": true, "content": { "application/json": { "schema": { "$ref": "#/components/schemas/BackupExport" } } } },
+        "responses": { "200": { "$ref": "#/components/responses/JSONObject" }, "400": { "$ref": "#/components/responses/BadRequest" }, "401": { "$ref": "#/components/responses/Unauthorized" } }
+      }
+    },
+    "/api/backup/import": {
+      "post": {
+        "operationId": "importBackup",
+        "summary": "Restore an encrypted backup",
+        "tags": ["Backup"],
+        "requestBody": { "required": true, "content": { "application/json": { "schema": { "$ref": "#/components/schemas/BackupImport" } } } },
+        "responses": { "200": { "$ref": "#/components/responses/JSONObject" }, "400": { "$ref": "#/components/responses/BadRequest" }, "401": { "$ref": "#/components/responses/Unauthorized" } }
+      }
+    },
+    "/api/davsync": {
+      "get": {
+        "operationId": "getDAVSync",
+        "summary": "Get WebDAV synchronization status",
+        "tags": ["Backup"],
+        "responses": { "200": { "$ref": "#/components/responses/JSONObject" }, "401": { "$ref": "#/components/responses/Unauthorized" } }
+      }
+    },
+    "/api/davsync/{action}": {
+      "post": {
+        "operationId": "changeDAVSync",
+        "summary": "Configure or run WebDAV synchronization",
+        "description": "`reveal` is unsupported in server mode; clients should present the server-side path themselves.",
+        "tags": ["Backup"],
+        "parameters": [{ "name": "action", "in": "path", "required": true, "schema": { "type": "string", "enum": ["save", "now", "off", "dismiss", "reveal"] } }],
+        "requestBody": { "content": { "application/json": { "schema": { "type": "object", "additionalProperties": true } } } },
+        "responses": { "200": { "$ref": "#/components/responses/JSONObject" }, "400": { "$ref": "#/components/responses/BadRequest" }, "401": { "$ref": "#/components/responses/Unauthorized" }, "404": { "$ref": "#/components/responses/NotFound" } }
+      }
+    },
+    "/api/library": {
+      "get": {
+        "operationId": "getLibrary",
+        "summary": "Get shared instructions, MCP servers, skills and agent destinations",
+        "tags": ["Library"],
+        "responses": { "200": { "$ref": "#/components/responses/JSONObject" }, "400": { "$ref": "#/components/responses/BadRequest" }, "401": { "$ref": "#/components/responses/Unauthorized" } }
+      }
+    },
+    "/api/library/skill": {
+      "get": {
+        "operationId": "getLibrarySkill",
+        "summary": "Read an installed skill",
+        "tags": ["Library"],
+        "parameters": [{ "name": "name", "in": "query", "required": true, "schema": { "type": "string" } }],
+        "responses": { "200": { "$ref": "#/components/responses/JSONObject" }, "400": { "$ref": "#/components/responses/BadRequest" }, "401": { "$ref": "#/components/responses/Unauthorized" } }
+      }
+    },
+    "/api/library/market/servers": {
+      "get": {
+        "operationId": "searchMarketServers",
+        "summary": "Search the MCP server market",
+        "tags": ["Library"],
+        "parameters": [{ "name": "q", "in": "query", "schema": { "type": "string" } }],
+        "responses": { "200": { "$ref": "#/components/responses/JSONObject" }, "401": { "$ref": "#/components/responses/Unauthorized" } }
+      }
+    },
+    "/api/library/market/skills": {
+      "get": {
+        "operationId": "searchMarketSkills",
+        "summary": "Search the skills market",
+        "tags": ["Library"],
+        "parameters": [{ "name": "q", "in": "query", "schema": { "type": "string" } }],
+        "responses": { "200": { "$ref": "#/components/responses/JSONObject" }, "401": { "$ref": "#/components/responses/Unauthorized" } }
+      }
+    },
+    "/api/library/market/about": {
+      "post": {
+        "operationId": "getMarketSkillDescriptions",
+        "summary": "Get descriptions for up to 60 market skill IDs",
+        "tags": ["Library"],
+        "requestBody": { "required": true, "content": { "application/json": { "schema": { "type": "object", "required": ["ids"], "properties": { "ids": { "type": "array", "maxItems": 60, "items": { "type": "string" } } } } } } },
+        "responses": { "200": { "$ref": "#/components/responses/JSONObject" }, "400": { "$ref": "#/components/responses/BadRequest" }, "401": { "$ref": "#/components/responses/Unauthorized" } }
+      }
+    },
+    "/api/library/icon": {
+      "get": {
+        "operationId": "getLibraryIcon",
+        "summary": "Fetch a cached market icon",
+        "tags": ["Library"],
+        "parameters": [{ "name": "u", "in": "query", "required": true, "schema": { "type": "string", "format": "uri" } }],
+        "responses": { "200": { "description": "Icon bytes", "content": { "image/*": { "schema": { "type": "string", "contentEncoding": "base64" } } } }, "401": { "$ref": "#/components/responses/Unauthorized" }, "404": { "$ref": "#/components/responses/NotFound" } }
+      }
+    },
+    "/api/library/skills/probe": {
+      "post": {
+        "operationId": "probeSkills",
+        "summary": "Inspect skills available at a source",
+        "tags": ["Library"],
+        "requestBody": { "required": true, "content": { "application/json": { "schema": { "type": "object", "required": ["source"], "properties": { "source": { "type": "string" } } } } } },
+        "responses": { "200": { "$ref": "#/components/responses/JSONObject" }, "400": { "$ref": "#/components/responses/BadRequest" }, "401": { "$ref": "#/components/responses/Unauthorized" } }
+      }
+    },
+    "/api/library/rtk": {
+      "get": {
+        "operationId": "getRTK",
+        "summary": "Get RTK status by agent",
+        "tags": ["Library"],
+        "responses": { "200": { "$ref": "#/components/responses/JSONObject" }, "401": { "$ref": "#/components/responses/Unauthorized" } }
+      },
+      "post": {
+        "operationId": "setRTK",
+        "summary": "Enable or disable RTK for an agent",
+        "tags": ["Library"],
+        "requestBody": { "required": true, "content": { "application/json": { "schema": { "type": "object", "required": ["agent", "on"], "properties": { "agent": { "type": "string" }, "on": { "type": "boolean" } } } } } },
+        "responses": { "200": { "$ref": "#/components/responses/JSONObject" }, "400": { "$ref": "#/components/responses/BadRequest" }, "401": { "$ref": "#/components/responses/Unauthorized" } }
+      }
+    },
+    "/api/library/rtk/install": {
+      "post": {
+        "operationId": "installRTK",
+        "summary": "Install RTK",
+        "description": "Installs RTK on the machine Magpie runs on and returns its status by agent.",
+        "tags": ["Library"],
+        "responses": { "200": { "$ref": "#/components/responses/JSONObject" }, "400": { "$ref": "#/components/responses/BadRequest" }, "401": { "$ref": "#/components/responses/Unauthorized" } }
+      }
+    },
+    "/api/sessions": {
+      "get": {
+        "operationId": "listSessions",
+        "summary": "List recent agent sessions",
+        "description": "Session paths under the home directory are abbreviated with `~`. `terminal` is always false in server mode.",
+        "tags": ["Sessions"],
+        "parameters": [{ "name": "limit", "in": "query", "required": false, "schema": { "type": "integer", "minimum": 0 } }],
+        "responses": { "200": { "$ref": "#/components/responses/JSONObject" }, "401": { "$ref": "#/components/responses/Unauthorized" } }
+      }
+    },
+    "/api/sessions/terminal": {
+      "post": {
+        "operationId": "openSessionTerminal",
+        "summary": "Resume a session in Terminal",
+        "description": "Unsupported in server mode. The session's `resume` command from GET /api/sessions remains available to the calling application.",
+        "tags": ["Host", "Sessions"],
+        "requestBody": { "required": true, "content": { "application/json": { "schema": { "type": "object", "required": ["agent", "id"], "properties": { "agent": { "type": "string" }, "id": { "type": "string" } } } } } },
+        "responses": { "400": { "$ref": "#/components/responses/HostUnavailable" }, "401": { "$ref": "#/components/responses/Unauthorized" } }
+      }
+    },
+    "/api/library/reveal": {
+      "post": {
+        "operationId": "revealLibraryPath",
+        "summary": "Reveal an allow-listed library path",
+        "description": "Unsupported in server mode. The requested path remains available to the calling application.",
+        "tags": ["Host", "Library"],
+        "requestBody": { "required": true, "content": { "application/json": { "schema": { "$ref": "#/components/schemas/PathRequest" } } } },
+        "responses": { "400": { "$ref": "#/components/responses/HostUnavailable" }, "401": { "$ref": "#/components/responses/Unauthorized" }, "403": { "description": "Path is not in the library view" } }
+      }
+    },
+    "/api/library/{what}/{action}": {
+      "post": {
+        "operationId": "changeLibrary",
+        "summary": "Change instructions, MCP servers, skills, market items or synchronize all",
+        "description": "Valid pairs are instructions/save, instructions/import, servers/save, servers/agents, servers/remove, servers/import, skills/install, skills/update, skills/agents, skills/remove, skills/import, market/server, market/skill and all/sync.",
+        "tags": ["Library"],
+        "parameters": [
+          { "name": "what", "in": "path", "required": true, "schema": { "type": "string", "enum": ["instructions", "servers", "skills", "market", "all"] } },
+          { "name": "action", "in": "path", "required": true, "schema": { "type": "string", "enum": ["save", "import", "agents", "remove", "install", "update", "server", "skill", "sync"] } }
+        ],
+        "requestBody": { "required": true, "content": { "application/json": { "schema": { "$ref": "#/components/schemas/LibraryChange" } } } },
+        "responses": { "200": { "$ref": "#/components/responses/JSONObject" }, "400": { "$ref": "#/components/responses/BadRequest" }, "401": { "$ref": "#/components/responses/Unauthorized" }, "404": { "$ref": "#/components/responses/NotFound" } }
+      }
+    },
+    "/api/update": {
+      "get": {
+        "operationId": "getUpdate",
+        "summary": "Get desktop updater state",
+        "description": "The desktop updater is not initialized by magpie serve; this endpoint is exposed for handler compatibility, not as a server update contract.",
+        "tags": ["Update"],
+        "responses": { "200": { "$ref": "#/components/responses/JSONObject" }, "401": { "$ref": "#/components/responses/Unauthorized" } }
+      }
+    },
+    "/api/update/check": {
+      "post": {
+        "operationId": "checkUpdate",
+        "summary": "Ask the desktop updater to check",
+        "description": "Exposed for handler compatibility; clients should not rely on desktop update behavior in server mode.",
+        "tags": ["Update"],
+        "responses": { "200": { "$ref": "#/components/responses/JSONObject" }, "401": { "$ref": "#/components/responses/Unauthorized" } }
+      }
+    },
+    "/api/update/install": {
+      "post": {
+        "operationId": "installUpdate",
+        "summary": "Ask the desktop updater to install",
+        "description": "Exposed for handler compatibility. Quit and browser-open actions are no-ops in server mode.",
+        "tags": ["Update", "Host"],
+        "responses": { "200": { "$ref": "#/components/responses/JSONObject" }, "204": { "description": "Update installed; server-mode Quit remains a no-op" }, "401": { "$ref": "#/components/responses/Unauthorized" } }
+      }
+    },
+    "/api/copy": {
+      "post": {
+        "operationId": "copyText",
+        "summary": "Copy text through the desktop host",
+        "description": "Unsupported in server mode. The calling application already has the text and should copy it locally.",
+        "tags": ["Host"],
+        "requestBody": { "required": true, "content": { "application/json": { "schema": { "type": "object", "required": ["text"], "properties": { "text": { "type": "string" } } } } } },
+        "responses": { "401": { "$ref": "#/components/responses/Unauthorized" }, "501": { "description": "Clipboard integration is unavailable" } }
+      }
+    },
+    "/api/open": {
+      "post": {
+        "operationId": "openURL",
+        "summary": "Open a URL through the desktop host",
+        "description": "No-op in server mode. The calling application should open the URL locally.",
+        "tags": ["Host"],
+        "requestBody": { "required": true, "content": { "application/json": { "schema": { "$ref": "#/components/schemas/URLRequest" } } } },
+        "responses": { "204": { "description": "Accepted; no browser is opened in server mode" }, "401": { "$ref": "#/components/responses/Unauthorized" } }
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": {
+      "bearerAuth": { "type": "http", "scheme": "bearer", "description": "The exact MAGPIE_ADMIN_TOKEN value." }
+    },
+    "responses": {
+      "State": { "description": "Current detected-agent state", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/State" } } } },
+      "SettingsState": { "description": "Settings and runtime facts", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/SettingsState" } } } },
+      "ProviderState": { "description": "Providers and gateway state", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ProviderState" } } } },
+      "JSONObject": { "description": "JSON object", "content": { "application/json": { "schema": { "type": "object", "additionalProperties": true } } } },
+      "JSONArray": { "description": "JSON array", "content": { "application/json": { "schema": { "type": "array", "items": {} } } } },
+      "BadRequest": { "description": "Invalid request or operation failure", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } } },
+      "Unauthorized": { "description": "Missing or invalid bearer token", "headers": { "WWW-Authenticate": { "schema": { "type": "string", "const": "Bearer" } } }, "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } } },
+      "NotFound": { "description": "Unknown resource or action" },
+      "HostUnavailable": { "description": "Desktop integration is unavailable in server mode", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } } }
+    },
+    "schemas": {
+      "Error": { "type": "object", "required": ["error"], "properties": { "error": { "type": "string" } } },
+      "Settings": {
+        "type": "object",
+        "properties": {
+          "theme": { "type": "string", "enum": ["", "system", "light", "dark"] },
+          "lang": { "type": "string", "enum": ["", "system", "en", "zh"] },
+          "tray": { "type": "string", "enum": ["", "panel", "window"] },
+          "dock": { "type": "boolean" },
+          "proxy": { "type": "string" },
+          "redact": { "type": "boolean" },
+          "redactPersonal": { "type": "boolean" },
+          "redactWords": { "type": "array", "items": { "type": "string" } },
+          "agentOrder": { "type": "array", "items": { "type": "string" } },
+          "agentsHidden": { "type": "array", "items": { "type": "string" } },
+          "agentsShown": { "type": "array", "items": { "type": "string" } },
+          "visible": { "type": "object", "additionalProperties": { "type": "array", "items": { "type": "string" } } },
+          "window": { "type": "array", "minItems": 2, "maxItems": 2, "items": { "type": "integer" } }
+        }
+      },
+      "SettingsState": {
+        "allOf": [
+          { "$ref": "#/components/schemas/Settings" },
+          { "type": "object", "required": ["version", "dir", "gateway", "proxyNow", "proxySource"], "properties": { "version": { "type": "string" }, "dir": { "type": "string" }, "gateway": { "type": "string", "format": "uri" }, "proxyNow": { "type": "string" }, "proxySource": { "type": "string" } } }
+        ]
+      },
+      "AgentOption": { "type": "object", "required": ["value", "note"], "properties": { "value": { "type": "string" }, "label": { "type": "string" }, "note": { "type": "string" }, "icon": { "type": "string" }, "icons": { "type": "array", "items": { "type": "string" } }, "group": { "type": "string" }, "groupIcon": { "type": "string" }, "ref": { "type": "string" } } },
+      "AgentField": { "type": "object", "required": ["key", "label", "value", "options"], "properties": { "key": { "type": "string" }, "label": { "type": "string" }, "value": { "type": "string" }, "options": { "type": "array", "items": { "$ref": "#/components/schemas/AgentOption" } } } },
+      "AgentDrift": { "type": "object", "required": ["kind", "field", "want", "detail"], "properties": { "kind": { "type": "string", "enum": ["unwired", "replaced", "bypassed"] }, "field": { "type": "string" }, "now": { "type": "string" }, "want": { "type": "string" }, "detail": { "type": "string" } } },
+      "Agent": { "type": "object", "required": ["id", "name", "icon", "path", "fields"], "properties": { "id": { "type": "string" }, "name": { "type": "string" }, "icon": { "type": "string" }, "path": { "type": "string" }, "fields": { "type": "array", "items": { "$ref": "#/components/schemas/AgentField" } }, "drift": { "$ref": "#/components/schemas/AgentDrift" } } },
+      "Client": { "type": "object", "required": ["id", "name", "icon"], "properties": { "id": { "type": "string" }, "name": { "type": "string" }, "icon": { "type": "string" } } },
+      "ProfileLibrary": { "type": "object", "required": ["servers", "skills", "instructions"], "properties": { "servers": { "type": "integer" }, "skills": { "type": "integer" }, "instructions": { "type": "boolean" } } },
+      "Profile": { "type": "object", "required": ["name", "summary"], "properties": { "name": { "type": "string" }, "summary": { "type": "string" }, "library": { "$ref": "#/components/schemas/ProfileLibrary" } } },
+      "State": { "type": "object", "required": ["agents", "clients", "profiles", "catalog", "settings"], "properties": { "agents": { "type": "array", "items": { "$ref": "#/components/schemas/Agent" } }, "clients": { "type": "array", "items": { "$ref": "#/components/schemas/Client" } }, "profiles": { "type": "array", "items": { "$ref": "#/components/schemas/Profile" } }, "catalog": { "type": "string" }, "notice": { "type": "string" }, "settings": { "$ref": "#/components/schemas/Settings" } } },
+      "AgentFieldChange": { "type": "object", "required": ["agent", "field", "value"], "properties": { "agent": { "type": "string" }, "field": { "type": "string" }, "value": { "type": "string" } } },
+      "AgentArrangement": { "type": "object", "properties": { "order": { "type": "array", "items": { "type": "string" } }, "hidden": { "type": "array", "items": { "type": "string" } }, "shown": { "type": "array", "items": { "type": "string" } } } },
+      "NameRequest": { "type": "object", "required": ["name"], "properties": { "name": { "type": "string" } } },
+      "URLRequest": { "type": "object", "required": ["url"], "properties": { "url": { "type": "string", "format": "uri" } } },
+      "PathRequest": { "type": "object", "required": ["path"], "properties": { "path": { "type": "string" } } },
+      "Base64Data": { "type": "object", "required": ["data"], "properties": { "data": { "type": "string", "contentEncoding": "base64" } } },
+      "IconReference": { "type": "object", "required": ["icon"], "properties": { "icon": { "type": "string" } } },
+      "ProviderChange": {
+        "type": "object",
+        "additionalProperties": true,
+        "properties": {
+          "id": { "type": "string" }, "name": { "type": "string" }, "preset": { "type": "string" },
+          "key": { "type": "string", "writeOnly": true }, "models": { "type": "array", "items": { "type": "string" } },
+          "fallback": { "type": "array", "items": { "type": "string" } }, "routing": { "type": "string" }, "affinity": { "type": "string" },
+          "new": { "type": "boolean" }, "from": { "type": "string" }, "clearBalanceToken": { "type": "boolean" }
+        }
+      },
+      "ProviderReference": { "type": "object", "required": ["id"], "additionalProperties": false, "properties": { "id": { "type": "string" } } },
+      "ProviderRouteChange": { "type": "object", "required": ["id", "routing"], "additionalProperties": false, "properties": { "id": { "type": "string" }, "routing": { "type": "string" } } },
+      "ProviderAffinityChange": { "type": "object", "required": ["id", "affinity"], "additionalProperties": false, "properties": { "id": { "type": "string" }, "affinity": { "type": "string" } } },
+      "ProviderSave": { "allOf": [{ "$ref": "#/components/schemas/ProviderChange" }, { "type": "object", "required": ["new"] }] },
+      "ProviderActionRequest": { "oneOf": [{ "$ref": "#/components/schemas/ProviderReference" }, { "$ref": "#/components/schemas/ProviderRouteChange" }, { "$ref": "#/components/schemas/ProviderAffinityChange" }, { "$ref": "#/components/schemas/ProviderSave" }] },
+      "ProviderModel": { "type": "object", "required": ["id", "name", "on"], "properties": { "id": { "type": "string" }, "name": { "type": "string" }, "efforts": { "type": "array", "items": { "type": "string" } }, "on": { "type": "boolean" } } },
+      "KeyInfo": { "type": "object", "required": ["id", "masked", "active", "on"], "properties": { "id": { "type": "string" }, "name": { "type": "string" }, "masked": { "type": "string" }, "active": { "type": "boolean" }, "on": { "type": "boolean" }, "protocol": { "type": "string", "enum": ["", "chat", "responses", "anthropic"] } } },
+      "Login": { "type": "object", "required": ["agent", "user", "seen", "active", "on"], "properties": { "agent": { "type": "string" }, "user": { "type": "string" }, "plan": { "type": "string" }, "seen": { "type": "string", "format": "date-time" }, "active": { "type": "boolean" }, "on": { "type": "boolean" }, "lapsed": { "type": "string" } } },
+      "Account": { "type": "object", "required": ["agent", "user"], "properties": { "agent": { "type": "string" }, "user": { "type": "string" }, "plan": { "type": "string" } } },
+      "AccountView": { "allOf": [{ "$ref": "#/components/schemas/Account" }, { "type": "object", "required": ["agentName", "agentIcon"], "properties": { "agentName": { "type": "string" }, "agentIcon": { "type": "string" }, "logins": { "type": "array", "items": { "$ref": "#/components/schemas/Login" } } } }] },
+      "ProviderAgent": { "type": "object", "required": ["id", "name", "icon", "current"], "properties": { "id": { "type": "string" }, "name": { "type": "string" }, "icon": { "type": "string" }, "current": { "type": "boolean" }, "model": { "type": "string" }, "group": { "type": "string" } } },
+      "ProviderView": {
+        "type": "object",
+        "required": ["id", "name", "icon", "preset", "host", "chat", "responses", "anthropic", "catalog", "website", "keysUrl", "balanceToken", "key", "ready", "chosen", "fallback", "routing", "affinity", "models", "exposed", "unlisted", "fetched", "agents", "sponsored", "keyList"],
+        "properties": {
+          "id": { "type": "string" }, "name": { "type": "string" }, "icon": { "type": "string" }, "preset": { "type": "string" }, "host": { "type": "string" },
+          "chat": { "type": "string" }, "responses": { "type": "string" }, "anthropic": { "type": "string" }, "catalog": { "type": "string" },
+          "website": { "type": "string" }, "keysUrl": { "type": "string" }, "headers": { "type": "object", "additionalProperties": { "type": "string" } },
+          "balanceURL": { "type": "string" }, "balancePath": { "type": "string" }, "modelsURL": { "type": "string" },
+          "balanceToken": { "type": "object", "required": ["takes", "set"], "properties": { "takes": { "type": "boolean" }, "set": { "type": "boolean" } } },
+          "key": { "type": "object", "required": ["set", "masked", "optional"], "properties": { "set": { "type": "boolean" }, "masked": { "type": "string" }, "optional": { "type": "boolean" } } },
+          "ready": { "type": "boolean" }, "chosen": { "type": "array", "items": { "type": "string" } }, "fallback": { "type": "array", "items": { "type": "string" } },
+          "routing": { "type": "string" }, "affinity": { "type": "string" }, "models": { "type": "array", "items": { "$ref": "#/components/schemas/ProviderModel" } },
+          "exposed": { "type": "integer" }, "unlisted": { "type": "boolean" }, "contexts": { "type": "object", "additionalProperties": { "type": "integer" } },
+          "fetched": { "type": "string" }, "agents": { "type": "array", "items": { "$ref": "#/components/schemas/ProviderAgent" } }, "sponsored": { "type": "boolean" },
+          "keyList": { "type": "array", "items": { "$ref": "#/components/schemas/KeyInfo" } }, "account": { "$ref": "#/components/schemas/AccountView" }
+        }
+      },
+      "GatewayState": { "type": "object", "required": ["url", "running", "mine", "models", "calls", "groups"], "properties": { "url": { "type": "string", "format": "uri" }, "running": { "type": "boolean" }, "mine": { "type": "boolean" }, "models": { "type": "integer" }, "calls": { "type": "array", "items": { "type": "object", "additionalProperties": true } }, "groups": { "type": "array", "items": { "type": "object", "additionalProperties": true } } } },
+      "ProviderState": { "type": "object", "required": ["providers", "presets", "excluded", "gateway"], "properties": { "providers": { "type": "array", "items": { "$ref": "#/components/schemas/ProviderView" } }, "presets": { "type": "array", "items": { "type": "object", "additionalProperties": true } }, "excluded": { "type": "array", "items": { "type": "object", "additionalProperties": true } }, "gateway": { "$ref": "#/components/schemas/GatewayState" } } },
+      "ProviderKeyResponse": { "type": "object", "required": ["key"], "properties": { "key": { "type": "string", "readOnly": true } } },
+      "ProviderTestResponse": { "type": "object", "required": ["results", "provider"], "properties": { "results": { "type": "array", "items": { "type": "object", "additionalProperties": true } }, "provider": { "type": "object", "additionalProperties": true } } },
+      "ProviderModelsResponse": { "type": "object", "required": ["count", "provider"], "properties": { "count": { "type": "integer" }, "provider": { "type": "object", "additionalProperties": true } } },
+      "ProviderActionResponse": { "oneOf": [{ "$ref": "#/components/schemas/ProviderState" }, { "$ref": "#/components/schemas/ProviderKeyResponse" }, { "$ref": "#/components/schemas/ProviderTestResponse" }, { "$ref": "#/components/schemas/ProviderModelsResponse" }] },
+      "LoginChange": { "type": "object", "required": ["agent", "user"], "properties": { "agent": { "type": "string" }, "user": { "type": "string" } } },
+      "KeyChange": { "type": "object", "required": ["id"], "properties": { "id": { "type": "string" }, "key": { "type": "string", "writeOnly": true }, "name": { "type": "string" }, "ref": { "type": "string" }, "protocol": { "type": "string" } } },
+      "SignInStatus": {
+        "type": "object",
+        "additionalProperties": true,
+        "properties": {
+          "id": { "type": "string" }, "state": { "type": "string", "enum": ["installing", "waiting", "done", "failed", "canceled"] },
+          "url": { "type": "string", "format": "uri" }, "user": { "type": "string" }, "error": { "type": "string" }, "using": { "type": "boolean" }
+        }
+      },
+      "GroupChange": {
+        "type": "object",
+        "additionalProperties": true,
+        "properties": {
+          "id": { "type": "string" }, "name": { "type": "string" }, "from": { "type": "string" },
+          "members": { "type": "array", "items": { "type": "string" } }, "routing": { "type": "string" }, "affinity": { "type": "string" },
+          "rules": { "type": "array", "items": { "type": "object", "additionalProperties": true } }
+        }
+      },
+      "BackupExport": { "type": "object", "required": ["pass", "keys"], "properties": { "pass": { "type": "string", "writeOnly": true }, "keys": { "type": "boolean" } } },
+      "BackupImport": { "type": "object", "required": ["data", "pass", "agents"], "properties": { "data": { "type": "string", "contentEncoding": "base64" }, "pass": { "type": "string", "writeOnly": true }, "agents": { "type": "boolean" } } },
+      "LibraryChange": {
+        "type": "object",
+        "additionalProperties": true,
+        "properties": {
+          "name": { "type": "string" }, "old": { "type": "string" }, "agents": { "type": "array", "items": { "type": "string" } },
+          "source": { "type": "string" }, "paths": { "type": "array", "items": { "type": "string" } }, "server": { "type": "object", "additionalProperties": true },
+          "id": { "type": "string" }, "values": { "type": "object", "additionalProperties": { "type": "string" } }
+        }
+      }
+    }
+  }
+}
