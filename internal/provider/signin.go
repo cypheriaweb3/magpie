@@ -93,6 +93,9 @@ func StartSignIn(agent string) (SignInState, error) {
 	cli, install := missingCLI(agent)
 	var installing context.Context
 	if install {
+		if err := allowCLIInstall(agent, cli); err != nil {
+			return SignInState{}, err
+		}
 		s.st.State, s.st.Installing = "installing", cli.Name
 		// canceling the sign-in stops the installer
 		installing, s.stop = context.WithCancel(context.Background())

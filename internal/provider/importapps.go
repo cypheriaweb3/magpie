@@ -360,6 +360,9 @@ func fileExists(p string) bool {
 }
 
 func claudeSettingsPath() string {
+	if runtimeHomeConfigured("claude") {
+		return filepath.Join(RuntimeHome("claude"), ".claude", "settings.json")
+	}
 	if dir := os.Getenv("CLAUDE_CONFIG_DIR"); dir != "" {
 		return filepath.Join(dir, "settings.json")
 	}

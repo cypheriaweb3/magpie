@@ -10,9 +10,10 @@ import (
 
 func codexConfigPath() string {
 	dir := os.Getenv("CODEX_HOME")
-	if dir == "" {
-		home, _ := os.UserHomeDir()
-		dir = filepath.Join(home, ".codex")
+	if runtimeHomeConfigured("codex") {
+		dir = filepath.Join(RuntimeHome("codex"), ".codex")
+	} else if dir == "" {
+		dir = filepath.Join(RuntimeHome("codex"), ".codex")
 	}
 	return filepath.Join(dir, "config.toml")
 }
@@ -109,7 +110,7 @@ func codexImportModels(configPath, catalogPath string) []string {
 	if catalogPath == "" {
 		return nil
 	}
-	home, _ := os.UserHomeDir()
+	home := RuntimeHome("codex")
 	if strings.HasPrefix(catalogPath, "~/") {
 		catalogPath = filepath.Join(home, strings.TrimPrefix(catalogPath, "~/"))
 	} else if !filepath.IsAbs(catalogPath) {

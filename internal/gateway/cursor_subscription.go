@@ -174,10 +174,11 @@ func cursorHome() (string, error) {
 	if err := os.MkdirAll(filepath.Join(home, ".cursor"), 0o700); err != nil {
 		return "", err
 	}
-	real, _ := os.UserHomeDir()
-	link := func(rel string) {
-		src, dst := filepath.Join(real, rel), filepath.Join(home, rel)
-		if _, err := os.Stat(src); err != nil {
+	real := provider.RuntimeHome("cursor")
+	link := func(src, rel string) {
+		dst := filepath.Join(home, rel)
+		st, err := os.Stat(src)
+		if err != nil {
 			return
 		}
 		if cur, err := os.Readlink(dst); err == nil && cur == src {
@@ -185,16 +186,20 @@ func cursorHome() (string, error) {
 		}
 		_ = os.MkdirAll(filepath.Dir(dst), 0o700)
 		_ = os.Remove(dst)
-		_ = os.Symlink(src, dst)
+		if err := os.Symlink(src, dst); err != nil && st.Mode().IsRegular() {
+			if raw, readErr := os.ReadFile(src); readErr == nil {
+				_ = os.WriteFile(dst, raw, st.Mode().Perm())
+			}
+		}
 	}
 	switch runtime.GOOS {
 	case "darwin":
-		link(filepath.Join("Library", "Keychains")) // where the CLI keeps its tokens
-		link(filepath.Join(".cursor", "auth.json"))
+		link(filepath.Join(real, "Library", "Keychains"), filepath.Join("Library", "Keychains"))
+		link(provider.CursorAuthPath(), filepath.Join(".cursor", "auth.json"))
 	case "linux":
-		if os.Getenv("XDG_CONFIG_HOME") == "" {
-			link(filepath.Join(".config", "cursor", "auth.json"))
-		}
+		link(provider.CursorAuthPath(), filepath.Join(".config", "cursor", "auth.json"))
+	case "windows":
+		link(provider.CursorAuthPath(), filepath.Join("AppData", "Roaming", "Cursor", "auth.json"))
 	}
 	// Only the caller's tools, never a shell or an edit of Cursor's own.
 	cfg, _ := json.Marshal(map[string]any{"version": 1, "permissions": map[string]any{
@@ -208,7 +213,8 @@ func cursorHome() (string, error) {
 }
 
 func cursorEnv(env []string, home string) []string {
-	blocked := map[string]bool{"HOME": true, "CURSOR_CONFIG_DIR": true, "CURSOR_API_KEY": true, "NO_OPEN_BROWSER": true}
+	blocked := map[string]bool{"HOME": true, "CURSOR_CONFIG_DIR": true, "CURSOR_API_KEY": true, "NO_OPEN_BROWSER": true,
+		"XDG_CONFIG_HOME": true, "XDG_DATA_HOME": true, "XDG_CACHE_HOME": true, "APPDATA": true, "LOCALAPPDATA": true}
 	if runtime.GOOS == "windows" {
 		blocked["USERPROFILE"] = true
 	}
@@ -221,7 +227,14 @@ func cursorEnv(env []string, home string) []string {
 	}
 	out = append(out, "HOME="+home)
 	if runtime.GOOS == "windows" {
-		out = append(out, "USERPROFILE="+home)
+		out = append(out, "USERPROFILE="+home,
+			"APPDATA="+filepath.Join(home, "AppData", "Roaming"),
+			"LOCALAPPDATA="+filepath.Join(home, "AppData", "Local"))
+	} else {
+		out = append(out,
+			"XDG_CONFIG_HOME="+filepath.Join(home, ".config"),
+			"XDG_DATA_HOME="+filepath.Join(home, ".local", "share"),
+			"XDG_CACHE_HOME="+filepath.Join(home, ".cache"))
 	}
 	return out
 }

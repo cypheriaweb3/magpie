@@ -1,6 +1,6 @@
 name: Release
 
-# Pushing a v* tag hands off to yetone/magpie-releases, which builds, signs,
+# Pushing a v* tag hands off to cypheriaweb3/magpie-releases, which builds, signs,
 # notarises and publishes magpie there; that repo is where people download
 # from, and the signing secrets live only there.
 
@@ -39,11 +39,11 @@ jobs:
       - name: Trigger release workflow in magpie-releases
         uses: peter-evans/repository-dispatch@v3
         with:
-          # PAT with contents write on yetone/magpie-releases.
+          # PAT with contents write on cypheriaweb3/magpie-releases.
           token: ${{ secrets.RELEASES_REPO_TOKEN }}
-          repository: yetone/magpie-releases
+          repository: cypheriaweb3/magpie-releases
           event-type: release
           client-payload: '{"ref": "${{ steps.version.outputs.ref }}", "version": "${{ steps.version.outputs.version }}"}'
 
       - name: Output status
-        run: echo "Watch the build at https://github.com/yetone/magpie-releases/actions"
+        run: echo "Watch the build at https://github.com/cypheriaweb3/magpie-releases/actions"

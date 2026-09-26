@@ -126,14 +126,8 @@ func randomToken() string {
 }
 
 func claudeBinary() (string, error) {
-	if p, err := exec.LookPath("claude"); err == nil {
-		return p, nil
-	}
-	home, _ := os.UserHomeDir()
-	for _, p := range []string{filepath.Join(home, ".local", "bin", "claude"), "/usr/local/bin/claude", "/opt/homebrew/bin/claude"} {
-		if st, err := os.Stat(p); err == nil && !st.IsDir() {
-			return p, nil
-		}
+	if path := provider.ClaudeExecutable(); path != "" {
+		return path, nil
 	}
 	return "", errors.New("Claude Code is not installed; install it and run `claude auth login`")
 }
@@ -181,7 +175,7 @@ func (b *subscriptionBridge) start(ctx context.Context, req *Request, model, oau
 	args := claudeCLIArgs(model, string(mcpConfig), req.Effort)
 	cmd := proc.CommandContext(context.Background(), binary, args...)
 	cmd.Dir = tmp
-	cmd.Env = netproxy.Env(cleanClaudeEnv(os.Environ()))
+	cmd.Env = netproxy.Env(provider.RuntimeEnv("claude", cleanClaudeEnv(os.Environ())))
 	if oauth != "" {
 		// a saved account in use beside the one Claude Code is signed in to
 		cmd.Env = append(cmd.Env, "CLAUDE_CODE_OAUTH_TOKEN="+oauth)

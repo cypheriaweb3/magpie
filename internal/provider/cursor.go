@@ -25,12 +25,15 @@ import (
 
 // CursorExecutable finds the cursor-agent CLI; a var so tests can fake it.
 var CursorExecutable = func() string {
+	if path, configured := configuredCLI("cursor"); configured {
+		return path
+	}
 	for _, name := range []string{"cursor-agent", "agent"} {
 		if p, err := exec.LookPath(name); err == nil && (name == "cursor-agent" || isCursorAgent(p)) {
 			return p
 		}
 	}
-	home, _ := os.UserHomeDir()
+	home := RuntimeHome("cursor")
 	for _, p := range []string{filepath.Join(home, ".local", "bin", "cursor-agent"), "/usr/local/bin/cursor-agent", "/opt/homebrew/bin/cursor-agent"} {
 		if st, err := os.Stat(p); err == nil && !st.IsDir() {
 			return p
@@ -88,7 +91,7 @@ func askCursorIdentity() (user, plan string, ok bool) {
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
-	out, _ := agentCommand(ctx, path, "about", "--format", "json").Output()
+	out, _ := agentCommand(ctx, "cursor", path, "about", "--format", "json").Output()
 	var about struct {
 		SubscriptionTier string `json:"subscriptionTier"`
 		UserEmail        string `json:"userEmail"`
@@ -130,7 +133,7 @@ func cursorModels(ctx context.Context) ([]catalog.Model, error) {
 	}
 	ctx, cancel := context.WithTimeout(ctx, 30*time.Second)
 	defer cancel()
-	out, err := agentCommand(ctx, path, "models").Output()
+	out, err := agentCommand(ctx, "cursor", path, "models").Output()
 	if err != nil {
 		return nil, errorf("cursor-agent models: %v", err)
 	}
@@ -211,7 +214,7 @@ func startCursorSignIn(s *signInFlow) error {
 	if path == "" {
 		return errorf("install Cursor's CLI first: curl https://cursor.com/install -fsS | bash")
 	}
-	return runCLISignIn(s, "cursor-agent login", append(os.Environ(), "NO_OPEN_BROWSER=1"), true, nil, func() (string, string, bool) {
+	return runCLISignIn(s, "cursor-agent login", append(RuntimeEnv("cursor", os.Environ()), "NO_OPEN_BROWSER=1"), true, nil, func() (string, string, bool) {
 		forgetCursorStatus()
 		return askCursorIdentity()
 	}, path, "login")

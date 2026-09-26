@@ -8,6 +8,7 @@ package provider
 
 import (
 	"context"
+	"fmt"
 	"os"
 	"os/exec"
 	"runtime"
@@ -52,6 +53,20 @@ func missingCLI(agent string) (agentCLI, bool) {
 		return agentCLI{}, false
 	}
 	return c, true
+}
+
+func allowCLIInstall(agent string, c agentCLI) error {
+	if err := configuredCLIError(agent, c.Name); err != nil {
+		return err
+	}
+	enabled, err := cliAutoInstallEnabled()
+	if err != nil {
+		return err
+	}
+	if !enabled {
+		return fmt.Errorf("%s is not installed and automatic CLI installation is disabled by %s=false", c.Name, cliAutoInstallEnv)
+	}
+	return nil
 }
 
 // installTimeout bounds an installer: they download a few hundred MB at most.
