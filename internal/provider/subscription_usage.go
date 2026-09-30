@@ -8,7 +8,6 @@ import (
 	"io"
 	"net/http"
 	"os"
-	"path/filepath"
 	"slices"
 	"sort"
 	"strconv"
@@ -215,25 +214,20 @@ func fetchSubscriptionUsage() []SubscriptionQuota {
 	if _, ok := grokAccount(); ok && !hidden["grok"] {
 		fetches = append(fetches, func() SubscriptionQuota { return grokSubscriptionUsage(via("grok")) })
 	}
-	if home, err := os.UserHomeDir(); err == nil {
-		if p, ok := codexAccount(home); ok && !hidden["codex"] {
-			if ls := accountsOf("codex"); len(ls) > 1 {
-				fetches = append(fetches, perLogin(via("codex"), ls, "Codex", "codex-color")...)
-			} else {
-				auth := filepath.Join(home, ".codex", "auth.json")
-				fetches = append(fetches, withUser(p.Account.User, func() SubscriptionQuota { return codexSubscriptionUsage(viaLogin("codex", p.Account.User), auth) }))
-			}
+	if p, ok := codexAccount(); ok && !hidden["codex"] {
+		if ls := accountsOf("codex"); len(ls) > 1 {
+			fetches = append(fetches, perLogin(via("codex"), ls, "Codex", "codex-color")...)
+		} else {
+			fetches = append(fetches, withUser(p.Account.User, func() SubscriptionQuota {
+				return codexSubscriptionUsage(viaLogin("codex", p.Account.User), codexAuthPath())
+			}))
 		}
-		cfg := os.Getenv("XDG_CONFIG_HOME")
-		if cfg == "" {
-			cfg = filepath.Join(home, ".config")
-		}
-		if app, ok := copilotLogin(cfg); ok && !hidden["copilot"] {
-			if ls := copilotLoginList(); len(ls) > 1 {
-				fetches = append(fetches, perLogin(via("copilot"), ls, "Copilot", "githubcopilot")...)
-			} else {
-				fetches = append(fetches, withUser(app.User, func() SubscriptionQuota { return copilotSubscriptionUsage(viaLogin("copilot", app.User), app.Token) }))
-			}
+	}
+	if app, ok := copilotLogin(copilotConfigDir()); ok && !hidden["copilot"] {
+		if ls := copilotLoginList(); len(ls) > 1 {
+			fetches = append(fetches, perLogin(via("copilot"), ls, "Copilot", "githubcopilot")...)
+		} else {
+			fetches = append(fetches, withUser(app.User, func() SubscriptionQuota { return copilotSubscriptionUsage(viaLogin("copilot", app.User), app.Token) }))
 		}
 	}
 	if key := kiroKey(); key != "" && !hidden["kiro"] {

@@ -24,7 +24,7 @@ import (
 // replaced at all (run from its disk image, say) is sent to the release page.
 type updater struct {
 	mu      sync.Mutex
-	state   string // checking | latest | downloading | ready | available | source | error
+	state   string // checking | latest | downloading | ready | available | source | off | error
 	latest  *update.Release
 	err     string
 	bundle  string      // the .app to replace, "" when not in one or stuck
@@ -36,6 +36,7 @@ type updater struct {
 	done    int64 // downloading: bytes so far, of total (0 when unknown)
 	total   int64
 	onReady func(version string)
+	off     bool // update.Disabled, when started: nothing is checked or downloaded
 }
 
 type updateJSON struct {
@@ -56,6 +57,12 @@ var updates = &updater{}
 const updateEvery = 6 * time.Hour
 
 func (u *updater) start() {
+	if update.Disabled {
+		u.mu.Lock()
+		u.state, u.off = "off", true // drawn as nothing, like a build from source
+		u.mu.Unlock()
+		return
+	}
 	if b := update.Bundle(); b != "" {
 		if u.stuck = update.Stuck(b); u.stuck == "" {
 			u.bundle = b
@@ -108,7 +115,7 @@ func (u *updater) recheck() {
 func (u *updater) begin() bool {
 	u.mu.Lock()
 	defer u.mu.Unlock()
-	if u.state == "checking" || u.state == "downloading" {
+	if u.off || u.state == "checking" || u.state == "downloading" {
 		return false
 	}
 	u.state, u.err, u.retry = "checking", "", false

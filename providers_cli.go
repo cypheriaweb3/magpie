@@ -771,6 +771,9 @@ func keyNote() string {
 
 // serve: `magpie serve` — the gateway alone, in the foreground.
 func serve() error {
+	if err := provider.ValidateRuntime(); err != nil {
+		return err
+	}
 	s := gateway.New()
 	go stats.Run(version, "serve")
 	go catalog.KeepFresh() // new models' prices, in a gateway left running

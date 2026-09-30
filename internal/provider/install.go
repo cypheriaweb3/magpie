@@ -8,6 +8,7 @@ package provider
 
 import (
 	"context"
+	"fmt"
 	"os"
 	"os/exec"
 	"runtime"
@@ -52,6 +53,27 @@ func missingCLI(agent string) (agentCLI, bool) {
 		return agentCLI{}, false
 	}
 	return c, true
+}
+
+// installCLIs is whether a sign-in installs the CLI it needs. Cypheria's
+// builds never do: the CLI is installed by whoever runs magpie, not by
+// magpie as a side effect of a sign-in. (The installer's tests turn it on.)
+var installCLIs = false
+
+// allowCLIInstall says why a sign-in may not install the CLI it lacks, and
+// how to install it by hand.
+func allowCLIInstall(agent string, c agentCLI) error {
+	if err := configuredCLIError(agent, c.Name); err != nil {
+		return err
+	}
+	if installCLIs {
+		return nil
+	}
+	how := c.sh
+	if runtime.GOOS == "windows" {
+		how = c.ps
+	}
+	return fmt.Errorf("%s is not installed; install it (%s) and start the sign-in again", c.Name, how)
 }
 
 // installTimeout bounds an installer: they download a few hundred MB at most.

@@ -30,7 +30,6 @@ import (
 	"net"
 	"net/http"
 	"net/url"
-	"os"
 	"path/filepath"
 	"strings"
 	"sync"
@@ -93,7 +92,7 @@ type cmdAuth struct {
 // ---- the CLI's own account ----------------------------------------------------
 
 func cmdAuthPath() string {
-	home, _ := os.UserHomeDir()
+	home := RuntimeHome("commandcode")
 	return filepath.Join(home, ".commandcode", "auth.json")
 }
 

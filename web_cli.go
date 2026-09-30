@@ -8,6 +8,7 @@ import (
 
 	"github.com/yetone/magpie/internal/gateway"
 	"github.com/yetone/magpie/internal/gui"
+	"github.com/yetone/magpie/internal/provider"
 )
 
 // webAddr is where `magpie web` listens unless told: beside the gateway.
@@ -31,6 +32,9 @@ func webCmd(args []string) error {
 		default:
 			return fmt.Errorf("magpie web: unknown %q · magpie web [--addr host:port] [--lan] [--no-open], MAGPIE_WEB_KEY to keep one key", a)
 		}
+	}
+	if err := provider.ValidateRuntime(); err != nil {
+		return err
 	}
 	if lan && addr == webAddr {
 		_, port, _ := net.SplitHostPort(webAddr)

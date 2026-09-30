@@ -271,14 +271,18 @@ func claudeUser(email, plan string, acct map[string]any) string {
 	return email + " · " + org
 }
 
+// codexAuthPath is where magpie reads and writes Codex's sign-in: ~/.codex,
+// whatever CODEX_HOME says, or the configured runtime home's.
 func codexAuthPath() string {
-	home, _ := os.UserHomeDir()
-	return filepath.Join(home, ".codex", "auth.json")
+	return filepath.Join(RuntimeHome("codex"), ".codex", "auth.json")
 }
 
 // claudeProfilePath is Claude Code's global state file, which holds the
 // signed-in account's identity next to much else.
 func claudeProfilePath() string {
+	if runtimeHomeConfigured("claude") {
+		return filepath.Join(RuntimeHome("claude"), ".claude", ".claude.json")
+	}
 	if dir := os.Getenv("CLAUDE_CONFIG_DIR"); dir != "" {
 		return filepath.Join(dir, ".claude.json")
 	}
@@ -644,13 +648,15 @@ func putClaudeLogin(l savedLogin) error {
 	_, loc, found := readClaudeCredential()
 	if !found {
 		// signed out: put it where Claude Code keeps it on this system
-		dir := os.Getenv("CLAUDE_CONFIG_DIR")
-		if dir == "" {
+		dir := ""
+		if runtimeHomeConfigured("claude") {
+			dir = filepath.Join(RuntimeHome("claude"), ".claude")
+		} else if dir = os.Getenv("CLAUDE_CONFIG_DIR"); dir == "" {
 			home, _ := os.UserHomeDir()
 			dir = filepath.Join(home, ".claude")
 		}
 		loc = claudeCredentialLocation{path: filepath.Join(dir, ".credentials.json")}
-		if claudeKeychain {
+		if claudeKeychain && !runtimeHomeConfigured("claude") {
 			loc = claudeCredentialLocation{keychain: true, account: claudeKeychainAccount()}
 		} else if err := os.MkdirAll(dir, 0o700); err != nil {
 			// Claude Code never run here yet

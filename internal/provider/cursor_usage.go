@@ -31,7 +31,7 @@ var cursorKeychain = runtime.GOOS == "darwin"
 // cursorToken is the access token cursor-agent signed in with: in the
 // Keychain on a Mac, in its auth.json elsewhere.
 func cursorToken() (string, error) {
-	if cursorKeychain {
+	if cursorKeychain && !runtimeHomeConfigured("cursor") {
 		out, err := proc.Command("security", "find-generic-password", "-s", "cursor-access-token", "-a", "cursor-user", "-w").Output()
 		if tok := strings.TrimSpace(string(out)); err == nil && tok != "" {
 			return tok, nil
@@ -48,9 +48,19 @@ func cursorToken() (string, error) {
 
 // cursorAuthPath is where cursor-agent keeps its sign-in outside the Keychain.
 func cursorAuthPath() string {
-	home, err := os.UserHomeDir()
-	if err != nil {
+	home := RuntimeHome("cursor")
+	if home == "" {
 		return ""
+	}
+	if runtimeHomeConfigured("cursor") {
+		switch runtime.GOOS {
+		case "windows":
+			return filepath.Join(home, "AppData", "Roaming", "Cursor", "auth.json")
+		case "darwin":
+			return filepath.Join(home, ".cursor", "auth.json")
+		default:
+			return filepath.Join(home, ".config", "cursor", "auth.json")
+		}
 	}
 	switch runtime.GOOS {
 	case "windows":

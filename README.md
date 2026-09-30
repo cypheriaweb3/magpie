@@ -239,6 +239,67 @@ Assist Standard and Enterprise, which need a Google Cloud project named
 Antigravity account it sees used outside Antigravity, so magpie asks before
 adding one; use an account you can afford to lose.
 
+#### Subscription providers that read another tool's sign-in
+
+| Provider | Login Magpie uses by default | How requests are served | Managed runtime overrides |
+| --- | --- | --- | --- |
+| Claude | Claude Code's macOS Keychain item or `~/.claude/.credentials.json` | The configured or discovered `claude` CLI; it is required for subscription generations | `MAGPIE_CLAUDE_HOME`, `MAGPIE_CLAUDE_CLI` |
+| Codex | `~/.codex/auth.json` | ChatGPT's Codex API directly; the `codex` CLI is optional and supplies its installed version | `MAGPIE_CODEX_HOME`, `MAGPIE_CODEX_CLI` |
+| Copilot | `~/.config/github-copilot/{apps,hosts}.json`, or the standalone CLI's `~/.copilot/config.json` and keychain token | GitHub Copilot directly; Magpie does not execute the `copilot` CLI | `MAGPIE_COPILOT_HOME` |
+| Cursor | The macOS Keychain or Cursor's platform `auth.json` | Cursor's agent API directly with the CLI's sign-in; the `cursor-agent` CLI supplies identity, models, its client version and token renewal | `MAGPIE_CURSOR_HOME`, `MAGPIE_CURSOR_CLI` |
+| Devin | `~/.local/share/devin/credentials.toml`, or `%APPDATA%\devin\credentials.toml` | Devin's API directly with the CLI's sign-in; the `devin` CLI supplies identity and models | `MAGPIE_DEVIN_HOME`, `MAGPIE_DEVIN_CLI` |
+| Gemini | Gemini CLI's `~/.gemini/oauth_creds.json` | Google Code Assist directly; no Gemini CLI process is required | `MAGPIE_GEMINI_HOME` |
+| Antigravity | Accounts added by Magpie and saved in Magpie's own `logins.json`; Magpie does not read Antigravity's application state | Google Code Assist directly | No external home or CLI is read |
+| Grok | `~/.grok/auth.json` | Grok's Responses API directly with the CLI's sign-in; the `grok` CLI renews that sign-in and supplies its version | `MAGPIE_GROK_HOME`, `MAGPIE_GROK_CLI` |
+| Kiro | kiro-cli's `data.sqlite3` in its platform data directory, or the Kiro IDE's `~/.aws/sso/cache`; a Kiro API key may be saved on the provider instead | Kiro's API directly; the `kiro-cli` CLI is optional and refreshes its own sign-in | `MAGPIE_KIRO_HOME`, `MAGPIE_KIRO_CLI` |
+| ZCode | `~/.zcode/v2/credentials.json`; `ZCODE_CREDENTIAL_SECRET` may provide its decryption seed | Z.ai's API directly; no ZCode CLI process is required | `MAGPIE_ZCODE_HOME` |
+| Command Code Plan | The Command Code CLI's `~/.commandcode/auth.json` | Command Code's API directly; no Command Code CLI process is required | `MAGPIE_COMMANDCODE_HOME` |
+| WorkBuddy, WorkBuddy AI | The WorkBuddy desktop app's `CodeBuddyExtension/Data/Public/auth/*.info` in its platform data directory | CodeBuddy's API directly; the app is not run | `MAGPIE_WORKBUDDY_HOME`, shared by both builds |
+
+Qoder, Zed, Factory, MiMo and StepFun keep the accounts Magpie signs in to
+in Magpie's own `logins.json`, and plugin providers keep theirs in
+`plugin-auth.json` beside it; they read no other tool's home, so they have no
+runtime override.
+
+Each `MAGPIE_<PROVIDER>_HOME` is an absolute virtual user home, not the
+provider's final configuration directory. Magpie applies the provider's normal
+layout below it, for example:
+
+```text
+$MAGPIE_CLAUDE_HOME/.claude/.credentials.json
+$MAGPIE_CODEX_HOME/.codex/auth.json
+$MAGPIE_CURSOR_HOME/.cursor/auth.json             # macOS
+$MAGPIE_DEVIN_HOME/.local/share/devin/credentials.toml
+$MAGPIE_GEMINI_HOME/.gemini/oauth_creds.json
+$MAGPIE_GROK_HOME/.grok/auth.json
+$MAGPIE_KIRO_HOME/Library/Application Support/kiro-cli/data.sqlite3  # macOS
+$MAGPIE_KIRO_HOME/.aws/sso/cache/kiro-auth-token.json
+$MAGPIE_ZCODE_HOME/.zcode/v2/credentials.json
+$MAGPIE_COMMANDCODE_HOME/.commandcode/auth.json
+$MAGPIE_WORKBUDDY_HOME/Library/Application Support/CodeBuddyExtension/Data/Public/auth/  # macOS
+```
+
+When a provider home is set, Magpie does not fall back to that provider's
+files or keychain entries in the real user home. CLI subprocesses receive a
+matching isolated `HOME`, `XDG_*` or Windows application-data environment.
+These variables do not relocate Magpie's own settings and `logins.json`.
+
+`MAGPIE_<PROVIDER>_CLI` must be an absolute path. Once set, Magpie uses only
+that file and does not search `PATH`, `~/.local/bin`, `/usr/local/bin` or
+Homebrew. `magpie serve` and `magpie web` reject an empty, relative or
+missing configured CLI and an empty or relative configured home before
+listening.
+
+This build never installs an agent's CLI by itself. Upstream magpie installs
+a missing Cursor, Devin or Grok CLI when a sign-in starts. Here the sign-in
+fails at once and names the vendor's installer; whoever runs magpie installs
+the CLI. Runtime overrides are fixed for the life of the process; restart magpie after
+changing them. One process accepts one home and one CLI per
+provider. Separate Magpie processes are required for multiple simultaneous
+homes of the same provider. When none of these Magpie variables is set, the
+existing provider variables and Magpie's normal home, keychain and `PATH`
+discovery keep their upstream behavior.
+
 ### Connecting anything else
 
 The gateway listens on `127.0.0.1:3425` (`MAGPIE_ADDR` changes it) and starts
@@ -272,6 +333,36 @@ it:
 The *Gateway* tab in the app has this as copy buttons and ready-made
 snippets (shell, curl, Python, Node) for each API, the list of model ids,
 and the recent calls; `MAGPIE_DEBUG=1` logs every call to the terminal.
+
+#### HTTP API
+
+`magpie web` serves the window's page and, behind the same key, the API the
+page uses. A program that starts magpie can drive it through that API with
+the key as a bearer token. Fix the key with `MAGPIE_WEB_KEY` (at least 16
+letters, digits or `- . _ ~`; `openssl rand -hex 16` makes one). Otherwise
+each run picks its own key and prints it in its link:
+
+```sh
+MAGPIE_WEB_KEY=0123456789abcdef0123456789abcdef \
+magpie web --addr 127.0.0.1:3430 --no-open
+
+curl -H 'Authorization: Bearer 0123456789abcdef0123456789abcdef' \
+  http://127.0.0.1:3430/api/state
+```
+
+The gateway starts beside it, on `MAGPIE_ADDR`. The OpenAPI 3.1 document of
+the API is at `/openapi.json`, behind the same key. There is no CORS policy:
+call the API from a backend or main process, never from a web page. The API
+exposes provider keys and other sensitive configuration over plain HTTP, so
+keep `--addr` on loopback.
+
+`magpie web` performs no desktop action for its caller. The caller opens
+URLs, copies text and shows files itself; in particular, it opens the URL
+returned by `/api/signin` on the user's machine. `POST /api/window/quit`
+stops `magpie web` and its gateway.
+
+This build never updates itself and never sends usage statistics. It is
+replaced along with whatever ships it.
 
 **Claude Code** gets `ANTHROPIC_BASE_URL`, `ANTHROPIC_AUTH_TOKEN` and the
 model variables in the `env` block of `settings.json`; picking a native
@@ -561,6 +652,86 @@ and architecture. Nothing else goes: no accounts, keys, providers, models,
 prompts or usage. Turn it off in Settings → Privacy → Count me as a user, or
 with `DO_NOT_TRACK=1` or `MAGPIE_NO_STATS=1`. Builds from source never send
 it. The code is [internal/stats](internal/stats/stats.go).
+
+## Cypheria fork: syncing and releasing
+
+[`cypheriaweb3/magpie`](https://github.com/cypheriaweb3/magpie) is upstream
+magpie plus exactly one Cypheria commit, *feat: serve magpie web's API to
+programs and isolate provider runtimes*. That commit:
+
+- adds bearer authentication and `/openapi.json` to `magpie web`
+  (*HTTP API*);
+- adds the provider runtime overrides (*Subscription providers that read
+  another tool's sign-in*);
+- turns off self-updating, usage statistics and installing agent CLIs at
+  sign-in;
+- points the release workflow at magpie-releases.
+
+Each Cypheria release is that commit replayed onto an upstream release tag
+`vX.Y.Z` and tagged `vX.Y.Z-cypheria`.
+[`cypheriaweb3/magpie-releases`](https://github.com/cypheriaweb3/magpie-releases)
+builds and publishes it. Its `main` is upstream `main` plus one Cypheria
+commit, *ci: build Cypheria magpie source*. The *chore: update homebrew
+tap* commits on it come from its release workflow's bot and are never
+replayed.
+
+The steps below assume local clones where `origin` is the yetone repository
+and `cypheria` is the cypheriaweb3 repository; `P` is the previous Cypheria
+tag and `vX.Y.Z` the new upstream tag.
+
+1. **Replay the source commit.** Run `git fetch origin --tags` and pick the
+   newest upstream `vX.Y.Z`. Then run `git switch --detach vX.Y.Z` and
+   `git cherry-pick P`.
+   When resolving conflicts, and when reviewing what upstream added since `P`:
+   - Route new provider code that reads another tool's sign-in, or runs its
+     CLI, through `RuntimeHome`, `RuntimeEnv` and `configuredCLI`, and list
+     the provider in *Subscription providers that read another tool's
+     sign-in*. Codex's `auth.json` stays in `~/.codex`, as upstream keeps it,
+     unless `MAGPIE_CODEX_HOME` is set.
+   - Document every new GUI route in `internal/gui/openapi.json`, saying what
+     `magpie web` does with any desktop action it asks for;
+     `TestOpenAPICoversGUIRoutes` lists the routes that are missing.
+   - Keep self-updating, usage statistics and CLI installs at sign-in off
+     (`update.Disabled`, `stats.Disabled`, `installCLIs`). Check any new
+     place where upstream checks for updates, sends statistics or installs
+     an agent's CLI unasked.
+2. **Check.** `go build ./...`, `go build -tags nogui ./...`, `go vet ./...`,
+   `go test ./...` and `go test -tags nogui . ./internal/provider` must all
+   pass.
+3. **Commit.** Keep it one commit with the same message, signed:
+   `git commit --amend -S --no-edit`.
+4. **Update magpie-releases first.** The release it is about to receive is
+   built with its current `main`:
+   ```sh
+   git fetch --all
+   git switch -C main origin/main
+   git cherry-pick <the "ci: build Cypheria magpie source" commit on cypheria/main>
+   # README: point the Cypheria build section at vX.Y.Z-cypheria
+   git commit --amend -S --no-edit
+   git push --force-with-lease=main:cypheria/main cypheria main
+   ```
+5. **Push the source commit to a branch, then the tag, as two separate
+   pushes.** GitHub creates no push event for a tag whose commit is on no
+   branch of the repository yet. Such a tag push starts no workflow, which
+   is why upstream pushes `main` before its tags.
+   ```sh
+   git push --force-with-lease=main:cypheria/main cypheria HEAD:refs/heads/main
+   git tag -s vX.Y.Z-cypheria -m "magpie vX.Y.Z-cypheria"
+   git push cypheria refs/tags/vX.Y.Z-cypheria
+   ```
+   Pushing `main` also runs *Test*. The tag runs *Release*, which sends a
+   `repository_dispatch` to magpie-releases with the `RELEASES_REPO_TOKEN`
+   secret.
+6. **Watch the release.**
+   - Run `gh run list -R cypheriaweb3/magpie-releases`, then `gh run watch`
+     on the new run.
+   - `gh release view vX.Y.Z-cypheria -R cypheriaweb3/magpie-releases` shows
+     the published assets.
+   - The workflow then commits the Homebrew tap update to the releases
+     `main`.
+
+   If *Release* did not start, dispatch it by hand. This has the same effect:
+   `gh workflow run Release -R cypheriaweb3/magpie --ref main -f version=X.Y.Z-cypheria`.
 
 ## Community
 
