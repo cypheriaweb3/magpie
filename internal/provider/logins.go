@@ -21,6 +21,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/yetone/magpie/internal/cypheria"
 	"github.com/yetone/magpie/internal/edit"
 	"github.com/yetone/magpie/internal/filememo"
 	"github.com/yetone/magpie/internal/plugin"
@@ -279,6 +280,9 @@ func claudeUser(email, plan string, acct map[string]any) string {
 }
 
 func codexAuthPath() string {
+	if dir := cypheria.Native("codex", "CODEX_HOME"); dir != "" {
+		return filepath.Join(dir, "auth.json")
+	}
 	home, _ := os.UserHomeDir()
 	return filepath.Join(home, ".codex", "auth.json")
 }
@@ -286,7 +290,7 @@ func codexAuthPath() string {
 // claudeProfilePath is Claude Code's global state file, which holds the
 // signed-in account's identity next to much else.
 func claudeProfilePath() string {
-	if dir := os.Getenv("CLAUDE_CONFIG_DIR"); dir != "" {
+	if dir := cypheria.Getenv("claude", "CLAUDE_CONFIG_DIR"); dir != "" {
 		return filepath.Join(dir, ".claude.json")
 	}
 	home, _ := os.UserHomeDir()
@@ -380,7 +384,7 @@ func claudeNotSignedInWhy() string {
 	c, _, ok := claudeCredential()
 	if !ok {
 		if claudeKeychain {
-			return `no "Claude Code-credentials" in the keychain magpie could read, and nothing at ` + claudeCredentialsPath()
+			return `no "` + claudeKeychainService() + `" in the keychain magpie could read, and nothing at ` + claudeCredentialsPath()
 		}
 		return "nothing at " + claudeCredentialsPath()
 	}
@@ -482,6 +486,9 @@ func rememberLogins(force bool) {
 // Logins lists the remembered accounts of an agent ("" for every one),
 // the active one flagged.
 func Logins(agent string) []Login {
+	if outOfScope(agent) {
+		return nil
+	}
 	if pp, ok := pluginOfAgent(agent); ok {
 		return pluginLoginList(pp)
 	}
@@ -602,6 +609,9 @@ func inUseOf(ls []Login) string {
 // they restart; so does Codex's background app-server, which new Codex
 // sessions attach to (CodexDaemonStale says when it is).
 func SwitchLogin(agent, user string) error {
+	if outOfScope(agent) {
+		return errOutOfScope(agent)
+	}
 	if pp, ok := pluginOfAgent(agent); ok {
 		return switchPluginLogin(pp, user)
 	}
@@ -702,7 +712,7 @@ func putClaudeLogin(l savedLogin) error {
 	_, loc, found := readClaudeCredential()
 	if !found {
 		// signed out: put it where Claude Code keeps it on this system
-		dir := os.Getenv("CLAUDE_CONFIG_DIR")
+		dir := cypheria.Getenv("claude", "CLAUDE_CONFIG_DIR")
 		if dir == "" {
 			home, _ := os.UserHomeDir()
 			dir = filepath.Join(home, ".claude")
@@ -745,6 +755,9 @@ func putClaudeLogin(l savedLogin) error {
 // ForgetLogin drops a remembered account. The one an agent is signed in to
 // now can't be forgotten; it would only be remembered again.
 func ForgetLogin(agent, user string) error {
+	if outOfScope(agent) {
+		return errOutOfScope(agent)
+	}
 	if pp, ok := pluginOfAgent(agent); ok {
 		return forgetPluginLogin(pp, user)
 	}

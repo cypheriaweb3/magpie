@@ -129,6 +129,9 @@ func loginEntry(agent string, x map[string]any) loginImport {
 // accounts from other tools' files (see above), each file's text one
 // element of files, and says what became of each.
 func ImportLogins(ctx context.Context, agent string, files []string) ([]ImportedAccount, error) {
+	if outOfScope(agent) {
+		return nil, errOutOfScope(agent)
+	}
 	if agent != "codex" && agent != "claude" {
 		return nil, fmt.Errorf("accounts can't be imported for %s", agent)
 	}

@@ -17,6 +17,8 @@ import (
 	"path/filepath"
 	"sync"
 	"time"
+
+	"github.com/yetone/magpie/internal/cypheria"
 )
 
 // rateURL is a free, no-key endpoint that gives every currency's rate
@@ -57,6 +59,9 @@ var (
 
 // CachePath is where the rate is kept between runs.
 func CachePath() string {
+	if d, ok := cypheria.CacheDir(); ok {
+		return filepath.Join(d, "fxrate.json")
+	}
 	if x := os.Getenv("XDG_CACHE_HOME"); x != "" {
 		return filepath.Join(x, "magpie", "fxrate.json")
 	}

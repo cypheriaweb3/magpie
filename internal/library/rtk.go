@@ -17,6 +17,7 @@ import (
 	"time"
 
 	"github.com/yetone/magpie/internal/agent"
+	"github.com/yetone/magpie/internal/cypheria"
 	"github.com/yetone/magpie/internal/edit"
 	"github.com/yetone/magpie/internal/proc"
 	"gopkg.in/yaml.v3"
@@ -484,9 +485,9 @@ type RTKView struct {
 	Upgrade string `json:"upgrade,omitempty"`
 	// Note is what an upgrade left to say: Homebrew's rtk behind rtk's
 	// own release
-	Note    string     `json:"note,omitempty"`
-	Agents  []RTKAgent `json:"agents"`
-	URL     string     `json:"url"`
+	Note   string     `json:"note,omitempty"`
+	Agents []RTKAgent `json:"agents"`
+	URL    string     `json:"url"`
 	// Install is the command Install RTK runs, shown before it is clicked
 	Install string `json:"install,omitempty"`
 	// Restart are the agents a change reached, to be restarted to see it
@@ -546,7 +547,13 @@ func lastLines(s string, n int) string {
 }
 
 // rtkAgents are the agents on this machine rtk can be given to.
+// errRTKOff answers rtk's changes when magpie runs for Cypheria.
+var errRTKOff = errors.New("rtk is off when magpie runs for Cypheria")
+
 func rtkAgents() []*agent.Agent {
+	if cypheria.Active() {
+		return nil // rtk's installer writes where it finds an agent, not where Cypheria keeps it
+	}
 	var out []*agent.Agent
 	for _, a := range agent.Detected() {
 		if _, ok := rtkSpecs[a.ID]; ok {
@@ -623,6 +630,9 @@ func shown(c []string) string {
 // by taking out what that put in — which needs no rtk, so an agent left
 // with the hook of an rtk since removed can be put right.
 func SetRTK(id string, on bool) (*RTKView, error) {
+	if cypheria.Active() {
+		return nil, errRTKOff
+	}
 	rtkMu.Lock()
 	defer rtkMu.Unlock()
 	var a *agent.Agent
@@ -726,6 +736,9 @@ func rtkInstaller() []string {
 
 // InstallRTK installs rtk, when the user asks for it.
 func InstallRTK() (*RTKView, error) {
+	if cypheria.Active() {
+		return nil, errRTKOff
+	}
 	rtkMu.Lock()
 	defer rtkMu.Unlock()
 	if rtkPath() != "" {

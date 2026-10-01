@@ -18,6 +18,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/yetone/magpie/internal/cypheria"
 	"github.com/yetone/magpie/internal/proc"
 )
 
@@ -48,6 +49,9 @@ func cursorToken() (string, error) {
 
 // cursorAuthPath is where cursor-agent keeps its sign-in outside the Keychain.
 func cursorAuthPath() string {
+	if dir := cypheria.Native("cursor", "CURSOR_CONFIG_DIR"); dir != "" {
+		return filepath.Join(dir, "auth.json")
+	}
 	home, err := os.UserHomeDir()
 	if err != nil {
 		return ""

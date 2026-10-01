@@ -69,6 +69,9 @@ func bunExe() string {
 // Bun is the bun to run plugins with: $MAGPIE_BUN when set, else the one
 // magpie downloaded, downloading it now when there is none yet.
 func Bun(ctx context.Context) (string, error) {
+	if pluginsOff() {
+		return "", errOff
+	}
 	if b := os.Getenv("MAGPIE_BUN"); b != "" {
 		return b, nil
 	}

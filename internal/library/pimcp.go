@@ -14,6 +14,7 @@ import (
 	"github.com/tidwall/jsonc"
 
 	"github.com/yetone/magpie/internal/agent"
+	"github.com/yetone/magpie/internal/cypheria"
 	"github.com/yetone/magpie/internal/edit"
 )
 
@@ -75,7 +76,7 @@ var piGlobalRoots = func() []string {
 	var out []string
 	h := home()
 	for _, k := range []string{"NPM_CONFIG_PREFIX", "npm_config_prefix"} {
-		if p := os.Getenv(k); p != "" {
+		if p := cypheria.Getenv("pi", k); p != "" {
 			if runtime.GOOS == "windows" {
 				out = append(out, filepath.Join(p, "node_modules"))
 			} else {

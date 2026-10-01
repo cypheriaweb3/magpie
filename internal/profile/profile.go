@@ -12,6 +12,7 @@ import (
 	"strings"
 
 	"github.com/yetone/magpie/internal/agent"
+	"github.com/yetone/magpie/internal/cypheria"
 	"github.com/yetone/magpie/internal/edit"
 	"github.com/yetone/magpie/internal/library"
 	"github.com/yetone/magpie/internal/provider"
@@ -74,6 +75,9 @@ func (p *Profile) UnmarshalJSON(b []byte) error {
 
 // Path is the profiles file.
 func Path() string {
+	if d, ok := cypheria.ConfigDir(); ok {
+		return filepath.Join(d, "profiles.json")
+	}
 	if x := os.Getenv("XDG_CONFIG_HOME"); x != "" {
 		return filepath.Join(x, "magpie", "profiles.json")
 	}

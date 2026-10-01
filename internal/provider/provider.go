@@ -21,6 +21,7 @@ import (
 	"time"
 
 	"github.com/yetone/magpie/internal/catalog"
+	"github.com/yetone/magpie/internal/cypheria"
 	"github.com/yetone/magpie/internal/plugin"
 	"github.com/yetone/magpie/internal/settings"
 )
@@ -187,6 +188,9 @@ type file struct {
 
 // Path is the file the user's providers live in.
 func Path() string {
+	if d, ok := cypheria.ConfigDir(); ok {
+		return filepath.Join(d, "providers.json")
+	}
 	if x := os.Getenv("XDG_CONFIG_HOME"); x != "" {
 		return filepath.Join(x, "magpie", "providers.json")
 	}

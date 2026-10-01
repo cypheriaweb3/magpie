@@ -14,6 +14,8 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/yetone/magpie/internal/cypheria"
 )
 
 // The plugin market: the plugins magpie suggests, from the community
@@ -69,6 +71,9 @@ type npmEntry struct {
 }
 
 func marketCache() string {
+	if d, ok := cypheria.CacheDir(); ok {
+		return filepath.Join(d, "plugin-market.json")
+	}
 	if x := os.Getenv("XDG_CACHE_HOME"); x != "" {
 		return filepath.Join(x, "magpie", "plugin-market.json")
 	}
@@ -101,6 +106,9 @@ func parseMarket(b []byte) ([]Listing, error) {
 // Market is the list of plugins magpie suggests: fetched at most every six
 // hours, else the copy fetched last, else the one built in.
 func Market(ctx context.Context) []Listing {
+	if pluginsOff() {
+		return nil
+	}
 	marketMu.Lock()
 	defer marketMu.Unlock()
 	if marketList != nil && time.Since(marketAt) < 6*time.Hour {
@@ -164,6 +172,9 @@ func npmPath(name string) string { return strings.Replace(url.PathEscape(name), 
 // Info is what npm says of each package, asked at most hourly and all at
 // once; a package npm doesn't have has no Version.
 func Info(ctx context.Context, names []string) map[string]NPM {
+	if pluginsOff() {
+		return nil
+	}
 	out := map[string]NPM{}
 	var wg sync.WaitGroup
 	var mu sync.Mutex
@@ -299,6 +310,9 @@ type Hit struct {
 
 // Search asks npm for OpenCode plugins matching q.
 func Search(ctx context.Context, q string) ([]Hit, error) {
+	if pluginsOff() {
+		return nil, errOff
+	}
 	q = strings.TrimSpace(q)
 	if q == "" {
 		return []Hit{}, nil
@@ -359,6 +373,9 @@ type Page struct {
 
 // Readme is the package's README, as npm has it.
 func Readme(ctx context.Context, name string) (Page, error) {
+	if pluginsOff() {
+		return Page{}, errOff
+	}
 	if !pkgName.MatchString(name) {
 		return Page{}, fmt.Errorf("%q isn't an npm package name", name)
 	}
@@ -399,6 +416,9 @@ func Installed(spec string) string {
 
 // Upgrade installs the newest version of one plugin.
 func Upgrade(ctx context.Context, name string) error {
+	if pluginsOff() {
+		return errOff
+	}
 	for _, e := range Load().Plugins {
 		if Name(e.Spec) == name && !IsPath(e.Spec) {
 			_, err := Add(ctx, name)

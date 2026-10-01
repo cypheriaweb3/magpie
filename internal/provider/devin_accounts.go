@@ -18,7 +18,6 @@ import (
 	"strings"
 
 	"github.com/yetone/magpie/internal/netproxy"
-	"github.com/yetone/magpie/internal/proc"
 )
 
 // devinAccountsDir holds the homes of the Devin accounts magpie signed in.
@@ -37,9 +36,8 @@ func devinCredentialsAt(home string) string {
 // "", else with magpie's home as its data folder.
 func devinCommand(ctx context.Context, home, path string, args ...string) *exec.Cmd {
 	if home == "" {
-		return agentCommand(ctx, path, args...)
+		return cliCommand(ctx, "devin", path, netproxy.Env(nil), args...)
 	}
-	cmd := proc.CommandContext(ctx, path, args...)
 	var env []string
 	for _, e := range os.Environ() {
 		k, _, _ := strings.Cut(e, "=")
@@ -49,8 +47,7 @@ func devinCommand(ctx context.Context, home, path string, args ...string) *exec.
 		}
 		env = append(env, e)
 	}
-	cmd.Env = netproxy.Env(append(env, "XDG_DATA_HOME="+home, "APPDATA="+home))
-	return cmd
+	return cliCommand(ctx, "devin", path, netproxy.Env(append(env, "XDG_DATA_HOME="+home, "APPDATA="+home)), args...)
 }
 
 // devinLogin is a Devin account and the home it is signed in in, "" for

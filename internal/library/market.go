@@ -20,6 +20,8 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/yetone/magpie/internal/cypheria"
 )
 
 // The market is where the page finds MCP servers and skills to add in one
@@ -714,6 +716,9 @@ var popular = struct {
 }{}
 
 func marketCache(name string) string {
+	if d, ok := cypheria.CacheDir(); ok {
+		return filepath.Join(d, "market", name)
+	}
 	d, err := os.UserCacheDir()
 	if err != nil {
 		return ""

@@ -8,7 +8,6 @@ import (
 	"io"
 	"net/http"
 	"os"
-	"path/filepath"
 	"sort"
 	"strconv"
 	"strings"
@@ -135,6 +134,7 @@ func visibleQuotas(all []SubscriptionQuota) []SubscriptionQuota {
 	for _, p := range load().Providers {
 		hidden[p.ID] = p.Hidden || p.Off // switched off: not asked either
 	}
+	hideOutOfScope(hidden)
 	var chosen map[string]map[string]bool
 	out := []SubscriptionQuota{}
 	for _, q := range all {
@@ -215,6 +215,7 @@ func fetchSubscriptionUsage() []SubscriptionQuota {
 	for _, p := range load().Providers {
 		hidden[p.ID] = p.Hidden || p.Off // switched off: not asked either
 	}
+	hideOutOfScope(hidden)
 	var fetches []func() SubscriptionQuota
 	// a built-in moved onto its plugin shows the plugin's cards in its
 	// place, and none of its own: an agent's own sign-in it still finds
@@ -248,7 +249,7 @@ func fetchSubscriptionUsage() []SubscriptionQuota {
 			if ls := accountsOf("codex"); len(ls) > 1 {
 				fetches = append(fetches, perLogin(via("codex"), ls, "Codex", "codex-color")...)
 			} else {
-				auth := filepath.Join(home, ".codex", "auth.json")
+				auth := codexAuthPath()
 				fetches = append(fetches, withUser(p.Account.User, func() SubscriptionQuota { return codexSubscriptionUsage(viaLogin("codex", p.Account.User), auth) }))
 			}
 		}

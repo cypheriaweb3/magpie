@@ -6,6 +6,7 @@ import (
 	"os"
 	"strings"
 
+	"github.com/yetone/magpie/internal/cypheria"
 	"github.com/yetone/magpie/internal/gateway"
 	"github.com/yetone/magpie/internal/gui"
 )
@@ -31,6 +32,9 @@ func webCmd(args []string) error {
 		default:
 			return fmt.Errorf("magpie web: unknown %q · magpie web [--addr host:port] [--lan] [--no-open], MAGPIE_WEB_KEY to keep one key", a)
 		}
+	}
+	if err := cypheria.Validate(); err != nil {
+		return err
 	}
 	if lan && addr == webAddr {
 		_, port, _ := net.SplitHostPort(webAddr)

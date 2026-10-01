@@ -17,6 +17,7 @@ import (
 
 	"github.com/yetone/magpie/internal/catalog"
 	"github.com/yetone/magpie/internal/codexcat"
+	"github.com/yetone/magpie/internal/cypheria"
 	"github.com/yetone/magpie/internal/proc"
 )
 
@@ -227,7 +228,7 @@ func codexInstructions(model string) string {
 	}); ok {
 		return s
 	}
-	dir := os.Getenv("CODEX_HOME")
+	dir := cypheria.Getenv("codex", "CODEX_HOME")
 	if dir == "" {
 		home, _ := os.UserHomeDir()
 		dir = filepath.Join(home, ".codex")

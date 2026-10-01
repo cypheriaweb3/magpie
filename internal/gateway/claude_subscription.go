@@ -40,6 +40,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/yetone/magpie/internal/cypheria"
 	"github.com/yetone/magpie/internal/netproxy"
 	"github.com/yetone/magpie/internal/proc"
 	"github.com/yetone/magpie/internal/provider"
@@ -157,7 +158,7 @@ type bridgeTool struct {
 }
 
 func claudeConfigDir() string {
-	if d := os.Getenv("CLAUDE_CONFIG_DIR"); d != "" {
+	if d := cypheria.Getenv("claude", "CLAUDE_CONFIG_DIR"); d != "" {
 		return d
 	}
 	home, _ := os.UserHomeDir()
@@ -220,6 +221,9 @@ func randomToken() string {
 }
 
 func claudeBinary() (string, error) {
+	if p, managed, err := managedClaude(); managed {
+		return p, err
+	}
 	if p, err := exec.LookPath("claude"); err == nil {
 		return p, nil
 	}
@@ -274,9 +278,8 @@ func (b *subscriptionBridge) start(ctx context.Context, req *Request, model, oau
 		"magpie": map[string]any{"command": exe, "args": []string{"claude-mcp-helper", callback, toolsPath}},
 	}})
 	args := claudeCLIArgs(model, string(mcpConfig), req.Effort, req.WebSearch)
-	cmd := proc.CommandContext(context.Background(), binary, args...)
+	cmd := claudeCommand(context.Background(), binary, netproxy.EnvWith(claudeProxy(ctx), cleanClaudeEnv(os.Environ())), args...)
 	cmd.Dir = tmp
-	cmd.Env = netproxy.EnvWith(claudeProxy(ctx), cleanClaudeEnv(os.Environ()))
 	if oauth != "" {
 		// a saved account in use beside the one Claude Code is signed in to
 		cmd.Env = append(cmd.Env, "CLAUDE_CODE_OAUTH_TOKEN="+oauth)

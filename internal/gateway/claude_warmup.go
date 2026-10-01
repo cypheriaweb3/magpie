@@ -9,7 +9,6 @@ import (
 	"strings"
 
 	"github.com/yetone/magpie/internal/netproxy"
-	"github.com/yetone/magpie/internal/proc"
 	"github.com/yetone/magpie/internal/provider"
 )
 
@@ -43,10 +42,9 @@ func askClaude(ctx context.Context, oauth, model string) error {
 		return err
 	}
 	defer os.RemoveAll(tmp)
-	cmd := proc.CommandContext(ctx, binary, claudeWarmArgs(model)...)
+	cmd := claudeCommand(ctx, binary, netproxy.EnvWith(claudeProxy(ctx), cleanClaudeEnv(os.Environ())), claudeWarmArgs(model)...)
 	cmd.Dir = tmp
 	cmd.Stdin = strings.NewReader("hi")
-	cmd.Env = netproxy.EnvWith(claudeProxy(ctx), cleanClaudeEnv(os.Environ()))
 	if oauth != "" {
 		cmd.Env = append(cmd.Env, "CLAUDE_CODE_OAUTH_TOKEN="+oauth)
 	}
@@ -91,10 +89,9 @@ func claudeUsage(ctx context.Context) (string, error) {
 		return "", err
 	}
 	defer os.RemoveAll(tmp)
-	cmd := proc.CommandContext(ctx, binary, claudeUsageArgs()...)
+	cmd := claudeCommand(ctx, binary, netproxy.EnvWith(claudeProxy(ctx), cleanClaudeEnv(os.Environ())), claudeUsageArgs()...)
 	cmd.Dir = tmp
 	cmd.Stdin = strings.NewReader("")
-	cmd.Env = netproxy.EnvWith(claudeProxy(ctx), cleanClaudeEnv(os.Environ()))
 	var out, stderr bytes.Buffer
 	cmd.Stdout, cmd.Stderr = &out, &stderr
 	runErr := cmd.Run()

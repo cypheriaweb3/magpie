@@ -14,6 +14,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/yetone/magpie/internal/cypheria"
 	"github.com/yetone/magpie/internal/edit"
 	"github.com/yetone/magpie/internal/proc"
 	"github.com/yetone/magpie/internal/provider"
@@ -139,6 +140,9 @@ func Running(patterns ...string) bool {
 
 // Detected reports whether the agent seems to be installed or configured.
 func (a *Agent) Detected() bool {
+	if cypheria.Active() {
+		return cypheria.Listed(a.ID) // installed and run by Cypheria, wherever
+	}
 	if a.detect != nil {
 		return a.detect()
 	}
