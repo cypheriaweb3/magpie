@@ -112,6 +112,9 @@ func StartSignIn(agent string) (SignInState, error) {
 // StartSignInAt is StartSignIn on one of the sites an agent signs in on:
 // ZCode's "zai" (the default) or "bigmodel".
 func StartSignInAt(agent, site string) (SignInState, error) {
+	if outOfScope(agent) {
+		return SignInState{}, errOutOfScope(agent)
+	}
 	// one moved onto its plugin signs in there: an account signed in to
 	// here would be the built-in's, which nothing serves now
 	if Moved(agent) {
@@ -122,6 +125,9 @@ func StartSignInAt(agent, site string) (SignInState, error) {
 	cli, install := missingCLI(agent)
 	var installing context.Context
 	if install {
+		if err := allowCLIInstall(agent, cli); err != nil {
+			return SignInState{}, err
+		}
 		s.st.State, s.st.Installing = "installing", cli.Name
 		// canceling the sign-in stops the installer
 		installing, s.stop = context.WithCancel(context.Background())

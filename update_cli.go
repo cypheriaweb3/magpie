@@ -131,6 +131,10 @@ func updateCmd(args []string) error {
 	if len(args) > 2 || len(args) == 2 && args[1] != "check" {
 		return fmt.Errorf("usage: magpie update [check] [--proxy <url>] [--mirror <prefix>]")
 	}
+	if update.Disabled {
+		fmt.Println("magpie", version, muted.Render("is Cypheria's build: it is updated with Cypheria, not by itself"))
+		return nil
+	}
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Minute)
 	defer cancel()
 	ctx = update.WithMirror(update.WithProxy(ctx, proxy), mirror)

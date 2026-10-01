@@ -8,7 +8,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/yetone/magpie/internal/appdir"
+	"github.com/yetone/magpie/internal/cypheria"
 )
 
 // Cline's CLI (3, on the Cline SDK) keeps a session in a folder of its own
@@ -27,12 +27,12 @@ import (
 // sessions in $CLINE_DATA_DIR, else in data in $CLINE_DIR, else in
 // ~/.cline/data.
 func ClineSessionDir() string {
-	if d := strings.TrimSpace(appdir.Getenv("CLINE_SESSION_DATA_DIR")); d != "" {
+	if d := strings.TrimSpace(cypheria.Getenv("cline", "CLINE_SESSION_DATA_DIR")); d != "" {
 		return d
 	}
-	data := strings.TrimSpace(appdir.Getenv("CLINE_DATA_DIR"))
+	data := strings.TrimSpace(cypheria.Getenv("cline", "CLINE_DATA_DIR"))
 	if data == "" {
-		dir := strings.TrimSpace(appdir.Getenv("CLINE_DIR"))
+		dir := strings.TrimSpace(cypheria.Getenv("cline", "CLINE_DIR"))
 		if dir == "" {
 			home, _ := os.UserHomeDir()
 			dir = filepath.Join(home, ".cline")

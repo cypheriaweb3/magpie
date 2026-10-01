@@ -54,7 +54,7 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/yetone/magpie/internal/appdir"
+	"github.com/yetone/magpie/internal/cypheria"
 	"github.com/yetone/magpie/internal/netproxy"
 	"github.com/yetone/magpie/internal/proc"
 	"github.com/yetone/magpie/internal/provider"
@@ -244,7 +244,7 @@ type bridgeTool struct {
 }
 
 func claudeConfigDir() string {
-	if d := appdir.Getenv("CLAUDE_CONFIG_DIR"); d != "" {
+	if d := cypheria.Getenv("claude", "CLAUDE_CONFIG_DIR"); d != "" {
 		return d
 	}
 	home, _ := os.UserHomeDir()
@@ -349,6 +349,9 @@ type claudeCLI struct {
 }
 
 func claudeBinary() (claudeCLI, error) {
+	if p, managed, err := managedClaude(); managed {
+		return claudeCLI{path: p}, err
+	}
 	if p, err := exec.LookPath("claude"); err == nil {
 		return claudeCLI{path: p}, nil
 	}
@@ -368,7 +371,7 @@ func (c claudeCLI) command(ctx context.Context, args ...string) *exec.Cmd {
 	if c.wsl != nil {
 		return c.wsl.Command(ctx, args...)
 	}
-	return proc.CommandContext(ctx, c.path, args...)
+	return claudeCommand(ctx, c.path, args...)
 }
 
 // claudeEnvVars are the variables magpie sets for a Claude Code run, which
@@ -381,7 +384,7 @@ var claudeEnvVars = []string{"ENABLE_CLAUDEAI_MCP_SERVERS", "DISABLE_AUTO_COMPAC
 func (c claudeCLI) env(env []string, configDir string) []string {
 	env = inClaudeDir(env, configDir)
 	if c.wsl == nil {
-		return env
+		return claudeEnv(env)
 	}
 	names := claudeEnvVars
 	if configDir != "" {

@@ -24,7 +24,6 @@ import (
 	"time"
 
 	"github.com/yetone/magpie/internal/netproxy"
-	"github.com/yetone/magpie/internal/proc"
 	"github.com/yetone/magpie/internal/wslrun"
 )
 
@@ -115,21 +114,21 @@ func (c claudeCLI) command(ctx context.Context, args ...string) *exec.Cmd {
 	if c.wsl != nil {
 		return c.wsl.Command(ctx, args...)
 	}
-	return proc.CommandContext(ctx, c.path, args...)
+	return cliCommand(ctx, "claude", c.path, nil, args...)
 }
 
 func (c claudeCLI) probe(ctx context.Context, args ...string) *exec.Cmd {
 	if c.wsl != nil {
 		return c.wsl.Probe(ctx, args...)
 	}
-	return proc.ProbeContext(ctx, c.path, args...)
+	return cliProbe(ctx, "claude", c.path, nil, args...)
 }
 
 // env is env for a sign-in's Claude Code: for one in WSL, what of it goes
 // in, its config directory and browser told by their paths there.
 func (c claudeCLI) env(env []string) []string {
 	if c.wsl == nil {
-		return env
+		return claudeEnv(env)
 	}
 	return c.wsl.Env(env, "CLAUDE_CONFIG_DIR/p", "BROWSER/p", openedURLEnv+"/p")
 }

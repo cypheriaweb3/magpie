@@ -9,6 +9,8 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/yetone/magpie/internal/cypheria"
 )
 
 // Sessions in WSL. On Windows an agent installed in a WSL distro keeps its
@@ -105,7 +107,7 @@ func wslListPath() string { return filepath.Join(filepath.Dir(CachePath()), "ses
 // as last listed; a listing is started behind when the last is older than
 // wslRelist.
 func wslFiles(agents ...string) []file {
-	if WSLHomes == nil {
+	if WSLHomes == nil || cypheria.Active() {
 		return nil
 	}
 	wslSess.Lock()
@@ -221,7 +223,7 @@ func wslList(gen uint64, done chan struct{}) {
 // wslCold reports whether path is in a WSL distro's home that isn't
 // running (or not yet known to run): such a file is not opened.
 func wslCold(path string) bool {
-	if WSLHomes == nil {
+	if WSLHomes == nil || cypheria.Active() {
 		return false
 	}
 	wslSess.Lock()
@@ -244,7 +246,7 @@ func under(path, dir string) bool {
 
 // wslDirs are the agents' folders in the distros sessions were found in.
 func wslDirs() []string {
-	if WSLHomes == nil {
+	if WSLHomes == nil || cypheria.Active() {
 		return nil
 	}
 	wslSess.Lock()

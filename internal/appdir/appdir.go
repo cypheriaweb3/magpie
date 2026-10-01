@@ -127,6 +127,9 @@ func absolute(p string) string {
 // Config is the folder magpie keeps its settings, providers, usage and the
 // rest of its own state in.
 func Config() string {
+	if d, ok := magpieHomeDir("config"); ok {
+		return d
+	}
 	if p := Portable(); p != "" {
 		return p
 	}
@@ -139,6 +142,9 @@ func Config() string {
 // Cache is the folder for what magpie can fetch again (the models.dev
 // catalog, exchange rates, market lists).
 func Cache() string {
+	if d, ok := magpieHomeDir("cache"); ok {
+		return d
+	}
 	if p := Portable(); p != "" {
 		return filepath.Join(p, "cache")
 	}
@@ -154,6 +160,9 @@ func Cache() string {
 // was, so nothing kept there is lost; portable, it is data\webview2, so a
 // portable magpie leaves no magpie.exe folder in the user's AppData (#508).
 func WebView() string {
+	if d, ok := magpieHomeDir("webview2"); ok {
+		return d
+	}
 	if p := Portable(); p != "" {
 		return filepath.Join(p, "webview2")
 	}
@@ -164,6 +173,9 @@ func WebView() string {
 // (~/Library/Caches/magpie on a Mac, %LocalAppData%\magpie on Windows),
 // which a few caches have always used; portable, it is Cache.
 func SystemCache() (string, error) {
+	if d, ok := magpieHomeDir("cache"); ok {
+		return d, nil
+	}
 	if p := Portable(); p != "" {
 		return filepath.Join(p, "cache"), nil
 	}

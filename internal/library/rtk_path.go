@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 	"runtime"
 
+	"github.com/yetone/magpie/internal/cypheria"
 	"github.com/yetone/magpie/internal/proc"
 )
 
@@ -67,6 +68,9 @@ func writable(dir string) bool {
 // PathRTK puts the rtk magpie found on the PATH agents get, when the user
 // asks for it (see rtkOnPath).
 func PathRTK() (*RTKView, error) {
+	if cypheria.Active() {
+		return nil, errRTKOff
+	}
 	rtkMu.Lock()
 	defer rtkMu.Unlock()
 	bin := rtkPath()

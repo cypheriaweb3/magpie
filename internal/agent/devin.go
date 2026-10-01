@@ -22,7 +22,7 @@ import (
 )
 
 func devin(home, cfg string) *Agent {
-	dir := filepath.Join(cfg, "devin")
+	dir := filepath.Join(configHomeOf("devin", cfg), "devin")
 	if runtime.GOOS == "windows" {
 		if app := appdir.Getenv("APPDATA"); app != "" {
 			dir = filepath.Join(app, "devin")

@@ -66,7 +66,7 @@ func grok(home string) *Agent { return grokIn(here(home)) }
 // (see wsl.go), where GROK_HOME isn't read and its models name the gateway
 // as the distro reaches it.
 func grokIn(at place) *Agent {
-	dir := at.getenv("GROK_HOME")
+	dir := at.envOf("grok", "GROK_HOME")
 	if dir == "" {
 		dir = filepath.Join(at.home, ".grok")
 	}

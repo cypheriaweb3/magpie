@@ -60,7 +60,7 @@ const findAge = time.Minute
 // distro first. ok is false off Windows, without WSL, or when no running
 // distro has it.
 func Find(name string) (Tool, bool) {
-	if !On {
+	if !On || cypheriaOff() {
 		return Tool{}, false
 	}
 	found.Lock()
@@ -107,6 +107,9 @@ func Find(name string) (Tool, bool) {
 // Known is the tool Find found last for name, however long ago, without
 // looking again: for a page to say where it runs without waiting on WSL.
 func Known(name string) (Tool, bool) {
+	if cypheriaOff() {
+		return Tool{}, false
+	}
 	found.Lock()
 	defer found.Unlock()
 	if p := found.tools[name]; p != nil {

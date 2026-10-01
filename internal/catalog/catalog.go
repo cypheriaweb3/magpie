@@ -18,6 +18,7 @@ import (
 	"time"
 
 	"github.com/yetone/magpie/internal/appdir"
+	"github.com/yetone/magpie/internal/cypheria"
 	"github.com/yetone/magpie/internal/filememo"
 )
 
@@ -771,7 +772,7 @@ func Providers() []string {
 
 // CodexHome is where Codex CLI keeps its state: $CODEX_HOME, else ~/.codex.
 func CodexHome() string {
-	if dir := appdir.Getenv("CODEX_HOME"); dir != "" {
+	if dir := cypheria.Getenv("codex", "CODEX_HOME"); dir != "" {
 		return dir
 	}
 	home, _ := os.UserHomeDir()

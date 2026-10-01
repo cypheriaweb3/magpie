@@ -157,6 +157,9 @@ func forgetProviders() {
 // Providers asks the plugins for their providers, starting the host if
 // need be, and keeps the answer for Cached.
 func Providers(ctx context.Context) ([]Provider, error) {
+	if pluginsOff() {
+		return nil, nil
+	}
 	var ps []Provider
 	if err := Call(ctx, "providers", map[string]any{"proxies": listingProxies()}, &ps); err != nil {
 		return nil, err
@@ -406,6 +409,9 @@ func Settle() {
 // host: what is known of them when magpie has only just started. A
 // provider's sign-in is read afresh from plugin-auth.json.
 func Cached() []Provider {
+	if pluginsOff() {
+		return nil
+	}
 	checkList()
 	l := list() // one read of plugins.json for the whole call
 	provMu.Lock()

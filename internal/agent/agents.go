@@ -15,6 +15,7 @@ import (
 
 	"github.com/yetone/magpie/internal/appdir"
 	"github.com/yetone/magpie/internal/catalog"
+	"github.com/yetone/magpie/internal/cypheria"
 	"github.com/yetone/magpie/internal/edit"
 	"github.com/yetone/magpie/internal/gateway"
 	"github.com/yetone/magpie/internal/provider"
@@ -63,7 +64,7 @@ func All() []*Agent {
 	if cfg == "" {
 		cfg = filepath.Join(home, ".config")
 	}
-	return append([]*Agent{
+	all := []*Agent{
 		claude(home),
 		claudeDesktop(home),
 		codex(home),
@@ -107,7 +108,11 @@ func All() []*Agent {
 		atomcode(home),
 		alma(),
 		cindy(),
-	}, wslAgents()...)
+	}
+	if cypheria.Active() {
+		return scoped(all)
+	}
+	return append(all, wslAgents()...)
 }
 
 // ---- accessors -------------------------------------------------------------
@@ -672,7 +677,7 @@ func sameGateway(base, v1 string) bool {
 
 func opencode(home, cfg string) *Agent {
 	return openCodeLike(here(home), "opencode", "OpenCode", "opencode", "opencode",
-		openCodeDir(cfg), filepath.Join(home, ".local", "share", "opencode", "auth.json"),
+		openCodeDir(configHomeOf("opencode", cfg)), filepath.Join(dataHomeOf("opencode", home), "opencode", "auth.json"),
 		[]string{"opencode"}, "oc")
 }
 
@@ -699,7 +704,7 @@ func mimocodeIn(at place) *Agent {
 // of the other; OpenCode 1 reads both, the variable's last, so what magpie
 // writes there wins in either.
 func openCodeDir(cfg string) string {
-	if d := strings.TrimSpace(appdir.Getenv("OPENCODE_CONFIG_DIR")); d != "" {
+	if d := strings.TrimSpace(cypheria.Getenv("opencode", "OPENCODE_CONFIG_DIR")); d != "" {
 		if abs, err := filepath.Abs(d); err == nil {
 			return abs
 		}
@@ -737,7 +742,7 @@ func piIn(at place) *Agent {
 // it is not taken; nor this machine's variable for a WSL distro's Pi.
 func piDir(at place) string {
 	if at.spell == nil {
-		if d := homeDir(at.home, appdir.Getenv("PI_CODING_AGENT_DIR")); d != "" {
+		if d := homeDir(at.home, cypheria.Getenv("pi", "PI_CODING_AGENT_DIR")); d != "" {
 			return d
 		}
 	}
@@ -856,8 +861,8 @@ func piLike(at place, id, name, dir string) *Agent {
 }
 
 func goose(home, cfg string) *Agent {
-	path := filepath.Join(cfg, "goose", "config.yaml")
-	if runtime.GOOS == "windows" {
+	path, own := gooseConfigOf(cfg)
+	if runtime.GOOS == "windows" && !own {
 		if app := appdir.Getenv("APPDATA"); app != "" {
 			path = filepath.Join(app, "Block", "goose", "config", "config.yaml")
 		}
@@ -934,7 +939,7 @@ func goose(home, cfg string) *Agent {
 }
 
 func cursor(home string) *Agent {
-	path := filepath.Join(home, ".cursor", "cli-config.json")
+	path := filepath.Join(cursorHomeOf(home), "cli-config.json")
 	return &Agent{
 		ID: "cursor", Name: "Cursor", Icon: "cursor", Aliases: []string{"cursor-agent"},
 		UA:  []string{"cursor"},
@@ -961,7 +966,7 @@ func cursor(home string) *Agent {
 }
 
 func copilot(home string) *Agent {
-	dir := filepath.Join(home, ".copilot")
+	dir := copilotHomeOf(home)
 	path := filepath.Join(dir, "settings.json")
 	return &Agent{
 		ID: "copilot", Name: "Copilot CLI", Icon: "githubcopilot", Aliases: []string{"gh-copilot"},

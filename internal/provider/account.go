@@ -33,6 +33,7 @@ import (
 
 	"github.com/yetone/magpie/internal/appdir"
 	"github.com/yetone/magpie/internal/catalog"
+	"github.com/yetone/magpie/internal/cypheria"
 	"github.com/yetone/magpie/internal/plugin"
 	"github.com/yetone/magpie/internal/proc"
 )
@@ -360,7 +361,7 @@ type claudeCredentialLocation struct {
 // claudeCredentialsPath is Claude Code's credentials file, where it keeps
 // its sign-in off the Mac's keychain.
 func claudeCredentialsPath() string {
-	dir := appdir.Getenv("CLAUDE_CONFIG_DIR")
+	dir := cypheria.Getenv("claude", "CLAUDE_CONFIG_DIR")
 	if dir == "" {
 		home, _ := os.UserHomeDir()
 		dir = filepath.Join(home, ".claude")
@@ -385,7 +386,7 @@ func readClaudeCredential() (claudeCredentials, claudeCredentialLocation, bool) 
 	var c claudeCredentials
 	var ok, wasHex bool
 	for _, args := range [][]string{{"-a", account}, nil} {
-		out, err := proc.Command("security", append([]string{"find-generic-password", "-s", "Claude Code-credentials", "-w"}, args...)...).Output()
+		out, err := proc.Command("security", append([]string{"find-generic-password", "-s", claudeKeychainService(), "-w"}, args...)...).Output()
 		if err != nil {
 			continue
 		}
@@ -483,7 +484,7 @@ func saveClaudeCredential(loc claudeCredentialLocation, c claudeCredentials) err
 			return err
 		}
 	} else {
-		args := []string{"add-generic-password", "-U", "-s", "Claude Code-credentials"}
+		args := []string{"add-generic-password", "-U", "-s", claudeKeychainService()}
 		if loc.account != "" {
 			args = append(args, "-a", loc.account)
 		}
@@ -498,6 +499,9 @@ func saveClaudeCredential(loc claudeCredentialLocation, c claudeCredentials) err
 
 // claudeExecutable finds the claude CLI; a var so tests can fake it.
 var claudeExecutable = func() string {
+	if p, managed := managedCLI("claude"); managed {
+		return p
+	}
 	if p, err := exec.LookPath("claude"); err == nil {
 		return p
 	}
@@ -562,8 +566,7 @@ func askClaudeStatus() (user, plan string, signedOut, ok bool) {
 	// settings.json it applies itself (auth status takes no
 	// --setting-sources), and then answers with no email; claudeSignedInUser
 	// names the account from ~/.claude.json instead (#177).
-	cmd := proc.ProbeContext(ctx, path, "auth", "status", "--json")
-	cmd.Env = withoutClaudeWiring(os.Environ())
+	cmd := cliProbe(ctx, "claude", path, withoutClaudeWiring(os.Environ()), "auth", "status", "--json")
 	out, _ := cmd.Output()
 	var status struct {
 		LoggedIn         *bool  `json:"loggedIn"`
@@ -663,6 +666,9 @@ func Accounts() []Provider {
 	cfg := appdir.Getenv("XDG_CONFIG_HOME")
 	if cfg == "" {
 		cfg = filepath.Join(home, ".config")
+	}
+	if cypheria.Active() {
+		return scopedAccounts(home, cfg)
 	}
 	var out []Provider
 	if p, ok := claudeAccount(); ok {
@@ -816,6 +822,9 @@ type codexAuth struct {
 
 func codexAccount(home string) (Provider, bool) {
 	path := filepath.Join(home, ".codex", "auth.json")
+	if dir := cypheria.Native("codex", "CODEX_HOME"); dir != "" {
+		path = filepath.Join(dir, "auth.json")
+	}
 	var a codexAuth
 	if !readJSON(path, &a) || a.Tokens.AccessToken == "" || a.AuthMode == "apikey" {
 		return Provider{}, false
@@ -963,6 +972,9 @@ type copilotApp struct {
 
 // copilotLogin finds the GitHub token Copilot's editors and CLI keep.
 func copilotLogin(cfg string) (copilotApp, bool) {
+	if cypheria.Active() {
+		return copilotCLILogin() // the Copilot CLI Cypheria manages; no editor's
+	}
 	var ghe *copilotApp // an editor's sign-in on an enterprise's <name>.ghe.com
 	for _, name := range []string{"apps.json", "hosts.json"} {
 		var apps map[string]copilotApp

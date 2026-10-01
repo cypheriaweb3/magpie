@@ -13,9 +13,10 @@ import (
 
 // readsEnv matches the two ways these packages name a variable they read to
 // find an agent's folder: as the argument of a Getenv, a LookupEnv or a
-// place's getenv, and as the env of a table entry, which is how Qoder's two
+// place's getenv (with the agent's id before it in cypheria.Getenv and a
+// place's envOf), and as the env of a table entry, which is how Qoder's two
 // builds are named (read through at.getenv(b.env)).
-var readsEnv = regexp.MustCompile(`(?:Getenv|LookupEnv|getenv)\("([A-Z][A-Z_0-9]*)"\)|env:\s*"([A-Z][A-Z_0-9]*)"`)
+var readsEnv = regexp.MustCompile(`(?:Getenv|LookupEnv|getenv|envOf)\((?:"[a-z-]+", )?"([A-Z][A-Z_0-9]*)"\)|env:\s*"([A-Z][A-Z_0-9]*)"`)
 
 // notAnAgent are the variables the same sources read that are not an agent's
 // folder, so no sandbox clears them through agentenv.Vars.

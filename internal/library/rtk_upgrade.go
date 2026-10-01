@@ -16,6 +16,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/yetone/magpie/internal/cypheria"
 	"github.com/yetone/magpie/internal/proc"
 	"github.com/yetone/magpie/internal/source"
 )
@@ -159,6 +160,9 @@ func rtkUpgrader(bin string) []string {
 
 // UpgradeRTK brings rtk up to its latest release the way it was installed.
 func UpgradeRTK() (*RTKView, error) {
+	if cypheria.Active() {
+		return nil, errRTKOff
+	}
 	rtkMu.Lock()
 	defer rtkMu.Unlock()
 	bin := rtkPath()

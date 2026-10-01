@@ -196,6 +196,9 @@ func (n *whatsNew) seen() {
 // error says the notes couldn't be had, which the page tells apart from
 // releases without notes (#661): the list failed and the feed had none.
 func fetchNotes(ctx context.Context, after, upto, lang string) ([]update.Note, error) {
+	if feedOff {
+		return nil, update.ErrDisabled
+	}
 	ctx, cancel := context.WithTimeout(ctx, 15*time.Second)
 	defer cancel()
 	notes, failed := update.NotesBetween(ctx, after, upto, lang)

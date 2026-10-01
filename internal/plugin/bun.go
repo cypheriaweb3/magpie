@@ -93,6 +93,9 @@ func bunExe() string {
 // magpie downloaded and keeps up to date, downloading it now when there
 // is none yet.
 func Bun(ctx context.Context) (string, error) {
+	if pluginsOff() {
+		return "", errOff
+	}
 	if b := os.Getenv("MAGPIE_BUN"); b != "" {
 		return b, nil
 	}

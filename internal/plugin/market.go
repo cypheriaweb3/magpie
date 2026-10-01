@@ -159,6 +159,9 @@ func parseMarket(b []byte) ([]Listing, error) {
 // Market is the list of plugins magpie suggests: fetched at most every six
 // hours, else the copy fetched last, else the one built in.
 func Market(ctx context.Context) []Listing {
+	if pluginsOff() {
+		return nil
+	}
 	marketMu.Lock()
 	defer marketMu.Unlock()
 	if marketList != nil && time.Since(marketAt) < 6*time.Hour {
@@ -252,6 +255,9 @@ func npmPath(name string) string { return strings.Replace(url.PathEscape(name), 
 // its answer, when it comes, is kept for the next time. A package npm
 // doesn't have has no Version.
 func Info(ctx context.Context, names []string) map[string]NPM {
+	if pluginsOff() {
+		return nil
+	}
 	out := map[string]NPM{}
 	var mu sync.Mutex
 	var wg sync.WaitGroup
@@ -426,6 +432,9 @@ type Hit struct {
 // packages, which list "pi-package" among their keywords as pi's own
 // gallery asks.
 func Search(ctx context.Context, q string) ([]Hit, error) {
+	if pluginsOff() {
+		return nil, errOff
+	}
 	q = strings.TrimSpace(q)
 	if q == "" {
 		return []Hit{}, nil
@@ -524,6 +533,9 @@ type Page struct {
 // from a folder on this computer or a git repository — the one its folder
 // carries.
 func Readme(ctx context.Context, name string) (Page, error) {
+	if pluginsOff() {
+		return Page{}, errOff
+	}
 	if IsPath(name) || IsGit(name) {
 		return folderReadme(Target(name))
 	}
@@ -604,6 +616,9 @@ func Installed(spec string) string {
 // Upgrade installs the newest version of one plugin: npm's, or its git
 // repository's commit now.
 func Upgrade(ctx context.Context, name string) error {
+	if pluginsOff() {
+		return errOff
+	}
 	for _, e := range Load().Plugins {
 		if (Name(e.Spec) == name || e.Spec == name) && IsGit(e.Spec) {
 			err := reinstall(ctx, e.Spec)

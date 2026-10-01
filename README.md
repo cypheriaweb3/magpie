@@ -672,6 +672,37 @@ The *Gateway* tab in the app has this as copy buttons and ready-made
 snippets (shell, curl, Python, Node) for each API, the list of model ids,
 and the recent calls; `MAGPIE_DEBUG=1` logs every call to the terminal.
 
+#### HTTP API
+
+`magpie web` serves the window's page and, behind the same key, the API the
+page uses. A program that starts magpie can drive it through that API with
+the key as a bearer token. Fix the key with `MAGPIE_WEB_KEY` (at least 16
+letters, digits or `- . _ ~`; `openssl rand -hex 16` makes one). Otherwise
+each run picks its own key and prints it in its link:
+
+```sh
+MAGPIE_WEB_KEY=0123456789abcdef0123456789abcdef \
+magpie web --addr 127.0.0.1:3430 --no-open
+
+curl -H 'Authorization: Bearer 0123456789abcdef0123456789abcdef' \
+  http://127.0.0.1:3430/api/state
+```
+
+The gateway starts beside it, on `MAGPIE_ADDR`. The OpenAPI 3.1 document of
+the API is at `/openapi.json`, behind the same key. There is no CORS policy:
+call the API from a backend or main process, never from a web page. The API
+exposes provider keys and other sensitive configuration over plain HTTP, so
+keep `--addr` on loopback.
+
+`magpie web` performs no desktop action for its caller. The caller opens
+URLs, copies text and shows files itself; in particular, it opens the URL
+returned by `/api/signin` on the user's machine. `POST /api/window/quit`
+stops `magpie web` and its gateway.
+
+This build never updates itself and never sends usage statistics. It is
+replaced along with whatever ships it. For Cypheria, see *Cypheria
+integration mode* below.
+
 **Claude Code** gets `ANTHROPIC_BASE_URL`, `ANTHROPIC_AUTH_TOKEN` and the
 model variables in the `env` block of `settings.json`; picking a native
 model (`opus`, `sonnet`…) removes them and restores whatever was there.
@@ -1274,6 +1305,236 @@ and architecture. Nothing else goes: no accounts, keys, providers, models,
 prompts or usage. Turn it off in Settings → Privacy → Count me as a user, or
 with `DO_NOT_TRACK=1` or `MAGPIE_NO_STATS=1`. Builds from source never send
 it. The code is [internal/stats](internal/stats/stats.go).
+
+## Cypheria integration mode
+
+Cypheria runs magpie as a server of its own, over the agents Cypheria
+installs and runs rather than the ones on this machine, and drives it
+through the *HTTP API*:
+
+```sh
+MAGPIE_HOME="$CYPHERIA_HOME/gateway" \
+MAGPIE_AGENTS_FILE="$CYPHERIA_HOME/gateway/agents.json" \
+MAGPIE_WEB_KEY=<32 random characters> \
+MAGPIE_ADDR=127.0.0.1:<gateway port> \
+magpie web --addr 127.0.0.1:<API port> --no-open
+```
+
+Choose both ports away from the 3425 and 3430 a magpie of the user's own
+takes. `magpie web` and `magpie serve` check both variables before they
+listen, and refuse a relative path or a wrong agents file.
+
+### `MAGPIE_HOME`
+
+magpie keeps all of its own files under `MAGPIE_HOME`: its settings,
+providers, sign-ins, usage, routing history and plugins in `config/`, and
+what it can fetch again in `cache/`. Nothing goes to `~/.config/magpie` or
+`~/.cache/magpie`, or to a portable magpie's data folder, so it shares
+nothing with a magpie the user runs. `MAGPIE_HOME` can be set without
+`MAGPIE_AGENTS_FILE`.
+
+### The agents file
+
+`MAGPIE_AGENTS_FILE` turns integration mode on. Cypheria writes the file,
+listing each agent it manages by magpie's id, as it runs that agent:
+
+```json
+{
+  "version": 1,
+  "agents": {
+    "codex": {
+      "command": "/…/toolchains/node/versions/24.21.0/bin/node",
+      "args": ["/…/agents/codex/versions/0.159.2/node_modules/@openai/codex/bin/codex.js"],
+      "cwd": "/…/agents/codex/home",
+      "env": { "CODEX_HOME": "/…/agents/codex/home", "PATH": "/…/toolchains/node/versions/24.21.0/bin:…" }
+    }
+  }
+}
+```
+
+The ids are magpie's: `claude`, `codex`, `gemini`, `agy`, `cursor`,
+`copilot`, `devin`, `goose`, `opencode`, `pi`, `cline` and `grok`. Three
+differ from Cypheria's: `antigravity-acp` is `agy`, `github-copilot-cli` is
+`copilot` and `grok-build` is `grok`. Any other id is refused.
+
+- `command` is an absolute path to an existing file.
+- `args` are the arguments that come before any of the CLI's own commands:
+  the script a `node` command runs, or the package an `npx` command runs.
+  They never include the arguments that start the agent's ACP or server
+  mode (`acp`, `--acp`, `agent stdio`), because magpie runs the CLI's own
+  commands, such as `auth status` or `--version`, after them.
+- `cwd` (optional) is an absolute folder. It is used where magpie names
+  none of its own.
+- `env` holds the variables Cypheria gives the agent beyond its own
+  environment: the agent's folders and the toolchain's `PATH`.
+
+magpie reads the file again whenever it changes. A file that has become
+wrong keeps the agents read before it, and says why in the log.
+
+When magpie runs an agent's CLI, the environment is magpie's, with the
+agent's `env` over it, and then whatever the particular use changes over
+that. For example, a second Grok account signs in with its own `GROK_HOME`.
+
+### What magpie does in integration mode
+
+**Agents.** magpie knows only the listed agents and treats each as
+installed. It finds each agent's settings, instructions, MCP servers,
+skills and sessions through the agent's own variables:
+
+| Agent | Variables | Settings magpie edits |
+| --- | --- | --- |
+| Claude Code | `CLAUDE_CONFIG_DIR` | `$CLAUDE_CONFIG_DIR/settings.json` |
+| Codex | `CODEX_HOME` | `$CODEX_HOME/config.toml` |
+| Gemini CLI | `GEMINI_CLI_HOME` | `$GEMINI_CLI_HOME/.gemini/settings.json` |
+| Antigravity | `GEMINI_HOME` | `$GEMINI_HOME/antigravity-cli/settings.json` |
+| Cursor | `CURSOR_CONFIG_DIR` | `$CURSOR_CONFIG_DIR/cli-config.json` |
+| Copilot CLI | `COPILOT_HOME` | `$COPILOT_HOME/settings.json` |
+| Devin | `XDG_CONFIG_HOME`, `XDG_DATA_HOME` | `$XDG_CONFIG_HOME/devin/config.json` |
+| Goose | `GOOSE_PATH_ROOT` | `$GOOSE_PATH_ROOT/config/config.yaml` |
+| OpenCode | `XDG_CONFIG_HOME`, `XDG_DATA_HOME` | `$XDG_CONFIG_HOME/opencode/` |
+| Pi | `PI_CODING_AGENT_DIR` | `$PI_CODING_AGENT_DIR/` |
+| Cline | `CLINE_DIR`, `CLINE_DATA_DIR` | `$CLINE_DATA_DIR/settings/providers.json` |
+| Grok Build | `GROK_HOME` | `$GROK_HOME/config.toml` |
+
+magpie runs an agent's CLI as the file says. It never installs or updates
+an agent's CLI: `POST /api/agents/cli/{id}` is refused, and a sign-in whose
+CLI is missing fails at once. It never looks for an agent or its CLI in a
+WSL distro either. rtk's hooks are off, and rtk is never installed or put
+on `PATH`, because rtk's own installer writes where it finds an agent, not
+where Cypheria keeps it.
+
+**Subscriptions.** magpie signs in to, lists, asks the quota of and serves
+only the subscriptions of the listed agents:
+
+| Subscription | Agent | Sign-in magpie reads and writes |
+| --- | --- | --- |
+| Claude | `claude` | Keychain item `Claude Code-credentials-<first 8 hex digits of SHA-256($CLAUDE_CONFIG_DIR)>`, as Claude Code names it; elsewhere `$CLAUDE_CONFIG_DIR/.credentials.json` |
+| Codex | `codex` | `$CODEX_HOME/auth.json` |
+| Copilot | `copilot` | `$COPILOT_HOME/config.json` and its keychain token; editors' Copilot sign-ins are not read |
+| Cursor | `cursor` | Cursor's keychain item, shared by every cursor-agent; elsewhere `$CURSOR_CONFIG_DIR/auth.json` |
+| Devin | `devin` | `$XDG_DATA_HOME/devin/credentials.toml` |
+| Gemini | `gemini` | `$GEMINI_CLI_HOME/.gemini/oauth_creds.json` |
+| Antigravity | `agy` | magpie's own sign-ins |
+| Grok | `grok` | `$GROK_HOME/auth.json` |
+
+Any other subscription is refused or left out. Providers used with a key
+are not limited. Plugins are off: none is added, signed in to or run, and
+nothing is downloaded for one. Switching an agent to an account with room,
+keeping sign-ins fresh and syncing the agents' model lists work as
+upstream's, on the listed agents and these subscriptions. So do the
+Sessions page's delete, restore and purge, on the listed agents' sessions.
+
+This build never asks upstream's release feed: not for a newer magpie, and
+not for What's new's notes.
+
+Without `MAGPIE_AGENTS_FILE`, magpie behaves as upstream's.
+
+## Cypheria fork: syncing and releasing
+
+[`cypheriaweb3/magpie`](https://github.com/cypheriaweb3/magpie) is upstream
+magpie plus exactly one Cypheria commit, *feat: run magpie for Cypheria
+over its agents, behind an HTTP API*. That commit:
+
+- adds bearer authentication and `/openapi.json` to `magpie web`
+  (*HTTP API*);
+- adds `MAGPIE_HOME` and the agents file (*Cypheria integration mode*),
+  mostly in `internal/cypheria` and the `cypheria.go` file of each package
+  it touches;
+- turns off self-updating, usage statistics and installing agent CLIs at
+  sign-in;
+- points the release workflow at magpie-releases.
+
+Each Cypheria release is that commit replayed onto an upstream release tag
+`vX.Y.Z` and tagged `vX.Y.Z-cypheria`.
+[`cypheriaweb3/magpie-releases`](https://github.com/cypheriaweb3/magpie-releases)
+builds and publishes it. Its `main` is upstream `main` plus one Cypheria
+commit, *ci: build Cypheria magpie source*. The *chore: update homebrew
+tap* commits on it come from its release workflow's bot and are never
+replayed.
+
+The steps below assume local clones where `origin` is the yetone repository
+and `cypheria` is the cypheriaweb3 repository; `P` is the previous Cypheria
+tag and `vX.Y.Z` the new upstream tag.
+
+1. **Replay the source commit.** Run `git fetch origin --tags` and pick the
+   newest upstream `vX.Y.Z`. Then run `git switch --detach vX.Y.Z` and
+   `git cherry-pick P`.
+   When resolving conflicts, and when reviewing what upstream added since `P`:
+   - Route new code that finds a file of one of the twelve agents, or runs
+     its CLI, through `internal/cypheria`. Use `cypheria.Getenv` where
+     upstream reads the agent's own variable, and `cypheria.Native` where it
+     reads none. A place's `getenv` in internal/agent becomes `envOf`.
+     Run a CLI through `cliCommand`, or `cliProbe` where upstream uses
+     `proc.ProbeContext` (provider), or through the `claudeCLI` of the
+     provider and the gateway, and find it with `cypheria.Executable`.
+   - Leave WSL out: `wslrun` finds nothing in integration mode, and a new
+     way of reaching agents or sessions in a distro checks
+     `cypheria.Active`.
+   - Read a new agent's sessions only when `cypheria.AgentAllowed` says so
+     (`allFiles`, `callFiles`, `Dirs` in internal/sessions).
+   - Upstream's new subscriptions join `accountIDs` and so stay out of
+     scope; a new way to sign in or list accounts calls `outOfScope`.
+   - Guard any new entry point of `internal/plugin` with `pluginsOff`. Turn
+     off any new installer of agents or tools that writes into an agent's
+     folders.
+   - Keep magpie's own files under `MAGPIE_HOME`: upstream builds their
+     paths on `appdir.Config` and `appdir.Cache`, which put them there
+     (`internal/appdir/cypheria.go`).
+   - Document every new GUI route in `internal/gui/openapi.json`, saying what
+     `magpie web` does with any desktop action it asks for;
+     `TestOpenAPICoversGUIRoutes` lists the routes that are missing.
+     Document every field upstream adds to a typed schema too:
+     `TestOpenAPISchemasMatchTypes` holds `State`, `SettingsState`,
+     `ProviderState`, `SignInStatus` and `AgentFieldChange` to the Go types
+     they come from, and lists each field missing, of the wrong type, or
+     required although it is left out when empty.
+   - Guard upstream's background jobs that fetch or run plugins
+     (`plugin.KeepUpdated`, `plugin.CheckUpdates`) with `pluginsOff`.
+   - Keep self-updating, usage statistics and CLI installs at sign-in off
+     (`update.Disabled`, `stats.Disabled`, `installCLIs`). `update.Disabled`
+     is checked by each caller of the feed (`update_cli.go`, the GUI's
+     updater, What's new's `feedOff`), so upstream's tests of the feed still
+     run. Check any new place where upstream checks for updates, sends
+     statistics or installs an agent's CLI unasked.
+2. **Check.** `go build ./...`, `go build -tags nogui ./...`, `go vet ./...`,
+   `go test ./...` and `go test -tags nogui . ./internal/gui
+   ./internal/provider ./internal/agent ./internal/cypheria/...` must all
+   pass, but for tests that fail the same way on upstream's tag in this
+   environment (run them in a worktree of `vX.Y.Z` to tell).
+3. **Commit.** Keep it one commit with the same message, signed:
+   `git commit --amend -S --no-edit`.
+4. **Update magpie-releases first.** The release it is about to receive is
+   built with its current `main`:
+   ```sh
+   git fetch --all
+   git switch -C main origin/main
+   git cherry-pick <the "ci: build Cypheria magpie source" commit on cypheria/main>
+   # README: point the Cypheria build section at vX.Y.Z-cypheria
+   git commit --amend -S --no-edit
+   git push --force-with-lease=main:cypheria/main cypheria main
+   ```
+5. **Push the source commit to a branch, then the tag, as two separate
+   pushes.** GitHub creates no push event for a tag whose commit is on no
+   branch of the repository yet. Such a tag push starts no workflow, which
+   is why upstream pushes `main` before its tags.
+   ```sh
+   git push --force-with-lease=main:cypheria/main cypheria HEAD:refs/heads/main
+   git tag -s vX.Y.Z-cypheria -m "magpie vX.Y.Z-cypheria"
+   git push cypheria refs/tags/vX.Y.Z-cypheria
+   ```
+   Pushing `main` also runs *Test*. The tag runs *Release*, which sends a
+   `repository_dispatch` to magpie-releases with the `RELEASES_REPO_TOKEN`
+   secret.
+6. **Watch the release.**
+   - Run `gh run list -R cypheriaweb3/magpie-releases`, then `gh run watch`
+     on the new run.
+   - `gh release view vX.Y.Z-cypheria -R cypheriaweb3/magpie-releases` shows
+     the published assets.
+   - The workflow then commits the Homebrew tap update to the releases
+     `main`.
+
+   If *Release* did not start, dispatch it by hand. This has the same effect:
+   `gh workflow run Release -R cypheriaweb3/magpie --ref main -f version=X.Y.Z-cypheria`.
 
 ## Community
 

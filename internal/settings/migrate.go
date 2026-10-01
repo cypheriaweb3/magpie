@@ -15,8 +15,8 @@ import (
 // The old folders can be deleted once nothing uses them. A portable
 // magpie has only its own data folder and copies nothing in.
 func Migrate() {
-	if Portable() != "" {
-		return
+	if Portable() != "" || appdir.MagpieHome() != "" {
+		return // MAGPIE_HOME is magpie's alone; there was never a dial there
 	}
 	copyTree(filepath.Join(filepath.Dir(Dir()), "dial"), Dir())
 	cache := appdir.Getenv("XDG_CACHE_HOME")

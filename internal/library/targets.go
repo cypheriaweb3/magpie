@@ -9,6 +9,7 @@ import (
 
 	"github.com/yetone/magpie/internal/agent"
 	"github.com/yetone/magpie/internal/appdir"
+	"github.com/yetone/magpie/internal/cypheria"
 )
 
 // Target is where one agent keeps each of the three: an empty path is
@@ -42,7 +43,7 @@ type Target struct {
 func home() string { h, _ := os.UserHomeDir(); return h }
 
 func claudeDir() string {
-	if d := appdir.Getenv("CLAUDE_CONFIG_DIR"); d != "" {
+	if d := cypheria.Getenv("claude", "CLAUDE_CONFIG_DIR"); d != "" {
 		return d
 	}
 	return filepath.Join(home(), ".claude")
@@ -51,14 +52,14 @@ func claudeDir() string {
 // claudeJSON is where Claude Code keeps its user-wide MCP servers: beside
 // its folder, or in it when CLAUDE_CONFIG_DIR moves it.
 func claudeJSON() string {
-	if d := appdir.Getenv("CLAUDE_CONFIG_DIR"); d != "" {
+	if d := cypheria.Getenv("claude", "CLAUDE_CONFIG_DIR"); d != "" {
 		return filepath.Join(d, ".claude.json")
 	}
 	return filepath.Join(home(), ".claude.json")
 }
 
 func codexDir() string {
-	if d := appdir.Getenv("CODEX_HOME"); d != "" {
+	if d := cypheria.Getenv("codex", "CODEX_HOME"); d != "" {
 		return d
 	}
 	return filepath.Join(home(), ".codex")
@@ -86,6 +87,9 @@ func targetOf(a *agent.Agent) *Target {
 		t.Skills = filepath.Join(d, "skills")
 	case "gemini":
 		d := filepath.Join(h, ".gemini")
+		if g := cypheria.Native("gemini", "GEMINI_CLI_HOME"); g != "" {
+			d = filepath.Join(g, ".gemini")
+		}
 		t.Instructions = filepath.Join(d, "GEMINI.md")
 		t.MCP = &mcpFile{Path: filepath.Join(d, "settings.json"), Format: fmtGemini}
 		t.Skills = filepath.Join(d, "skills")
@@ -97,6 +101,9 @@ func targetOf(a *agent.Agent) *Target {
 		// add` writes that file); agy 1.2 reads no mcp_config.json from the
 		// IDE's older ~/.gemini/antigravity.
 		d := filepath.Join(h, ".gemini", "config")
+		if g := cypheria.Native("agy", "GEMINI_HOME"); g != "" {
+			d = filepath.Join(g, "config")
+		}
 		t.Instructions = filepath.Join(d, "GEMINI.md")
 		t.MCP = &mcpFile{Path: filepath.Join(d, "mcp_config.json"), Format: fmtAntigravity}
 		t.Skills = filepath.Join(d, "skills")
@@ -157,10 +164,13 @@ func targetOf(a *agent.Agent) *Target {
 		t.Skills = sharedSkillsDir()
 	case "cursor":
 		d := filepath.Join(h, ".cursor")
+		if c := cypheria.Native("cursor", "CURSOR_CONFIG_DIR"); c != "" {
+			d = c
+		}
 		t.MCP = &mcpFile{Path: filepath.Join(d, "mcp.json"), Format: fmtCursor}
 		t.Skills = filepath.Join(d, "skills")
 	case "copilot":
-		d := appdir.Getenv("COPILOT_HOME")
+		d := cypheria.Getenv("copilot", "COPILOT_HOME")
 		if d == "" {
 			d = filepath.Join(h, ".copilot")
 		}
@@ -247,7 +257,7 @@ func targetOf(a *agent.Agent) *Target {
 		// Cline's CLI reads its MCP servers from settings/
 		// cline_mcp_settings.json beside providers.json, or
 		// $CLINE_MCP_SETTINGS_PATH (@cline/shared's storage)
-		p := appdir.Getenv("CLINE_MCP_SETTINGS_PATH")
+		p := cypheria.Getenv("cline", "CLINE_MCP_SETTINGS_PATH")
 		if p == "" {
 			p = filepath.Join(filepath.Dir(a.Path), "cline_mcp_settings.json")
 		}
@@ -338,6 +348,9 @@ func wslTargetOf(a *agent.Agent) *Target {
 // apps are what the library can give MCP servers to that aren't agents
 // magpie sets up: known by the folder they keep their settings in.
 func apps() []*agent.Agent {
+	if cypheria.Active() {
+		return nil // only the agents Cypheria manages
+	}
 	d, err := os.UserConfigDir()
 	if err != nil {
 		return nil

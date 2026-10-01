@@ -16,6 +16,7 @@ import (
 	"time"
 
 	"github.com/yetone/magpie/internal/appdir"
+	"github.com/yetone/magpie/internal/cypheria"
 )
 
 // Call is one model call as an agent's own session file records it.
@@ -194,22 +195,34 @@ func callFiles() []file {
 			}
 		}
 	}
-	add(ccFiles("claude", ClaudeDir()))
-	for _, d := range callDesktopDirs() {
-		// Cowork keeps a Claude Code folder of its own for each session
-		homes, _ := SessionGlob(filepath.Join(d, "local-agent-mode-sessions", "*", "*", "local_*", ".claude"))
-		for _, h := range homes {
-			add(ccFiles("claude-desktop", h))
+	// in integration mode, only the agents Cypheria manages
+	if cypheria.AgentAllowed("claude") {
+		add(ccFiles("claude", ClaudeDir()))
+	}
+	if cypheria.AgentAllowed("claude-desktop") {
+		for _, d := range callDesktopDirs() {
+			// Cowork keeps a Claude Code folder of its own for each session
+			homes, _ := SessionGlob(filepath.Join(d, "local-agent-mode-sessions", "*", "*", "local_*", ".claude"))
+			for _, h := range homes {
+				add(ccFiles("claude-desktop", h))
+			}
 		}
 	}
-	add(codexFiles())
+	if cypheria.AgentAllowed("codex") {
+		add(codexFiles())
+	}
 	add(wslFiles("claude", "codex"))
 	return out
 }
 
 // callSources are callFiles and OpenCode's sessions (#680), whose calls are
 // rows of its database or its JSON files rather than lines.
-func callSources() []file { return append(callFiles(), openCodeCallFiles()...) }
+func callSources() []file {
+	if !cypheria.AgentAllowed("opencode") {
+		return callFiles()
+	}
+	return append(callFiles(), openCodeCallFiles()...)
+}
 
 // desktopDataDirs are Claude Desktop's Claude and Claude-3p folders on this
 // computer, found as desktopDirs in internal/agent's claudedesktop.go does

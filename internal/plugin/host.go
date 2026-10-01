@@ -763,6 +763,9 @@ func Call(ctx context.Context, method string, params, out any) error {
 // Background listings allow the host its own startup budget. The optional
 // timeout begins only after initialization and bounds just the requested RPC.
 func callWithTimeout(ctx context.Context, method string, params, out any, timeout time.Duration) error {
+	if pluginsOff() {
+		return errOff
+	}
 	startup := ctx
 	if timeout > 0 {
 		startup = context.WithoutCancel(ctx)
@@ -785,6 +788,9 @@ func callWithTimeout(ctx context.Context, method string, params, out any, timeou
 // Plugins is how each plugin fared when the host loaded it, starting the
 // host if need be.
 func Plugins(ctx context.Context) ([]Loaded, error) {
+	if pluginsOff() {
+		return nil, nil
+	}
 	h, err := get(ctx)
 	if err != nil {
 		return nil, err

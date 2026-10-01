@@ -22,7 +22,7 @@ import (
 // key and names the catalog model in model.name.
 
 func gemini(home string) *Agent {
-	dir := filepath.Join(home, ".gemini")
+	dir := geminiHomeOf(home)
 	path := filepath.Join(dir, "settings.json")
 	envPath := filepath.Join(dir, ".env")
 	auth := jsonGet(path, "security.auth.selectedType")

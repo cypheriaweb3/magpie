@@ -111,6 +111,9 @@ var pluginsList struct {
 // list is plugins.json, read now. What it gives is shared and must not be
 // changed; Load gives the mutable copy.
 func list() List {
+	if pluginsOff() {
+		return List{}
+	}
 	path := listPath()
 	b, err := steady.ReadFile(path)
 	if err != nil {
@@ -330,6 +333,9 @@ func Target(spec string) string {
 // Add installs a plugin and adds it to the list, in place of one of the
 // same package. A package is installed with its scripts left unrun.
 func Add(ctx context.Context, spec string) (Entry, error) {
+	if pluginsOff() {
+		return Entry{}, errOff
+	}
 	spec = strings.TrimSpace(spec)
 	if spec == "" {
 		return Entry{}, errors.New("no plugin given")
@@ -394,6 +400,9 @@ func Add(ctx context.Context, spec string) (Entry, error) {
 // Update installs the version of each npm plugin its spec says now
 // (latest, for the most part), and fetches each git one again.
 func Update(ctx context.Context) error {
+	if pluginsOff() {
+		return errOff
+	}
 	var errs []error
 	for _, e := range Load().Plugins {
 		if !IsPath(e.Spec) {
@@ -412,6 +421,9 @@ func Update(ctx context.Context) error {
 
 // Remove takes a plugin off the list (and out of plugins/).
 func Remove(ctx context.Context, name string) error {
+	if pluginsOff() {
+		return errOff
+	}
 	listMu.Lock()
 	l := Load()
 	i := slices.IndexFunc(l.Plugins, func(x Entry) bool { return Name(x.Spec) == name || x.Spec == name })
@@ -437,6 +449,9 @@ func Remove(ctx context.Context, name string) error {
 
 // SetOff turns a plugin off or back on.
 func SetOff(name string, off bool) error {
+	if pluginsOff() {
+		return errOff
+	}
 	listMu.Lock()
 	defer listMu.Unlock()
 	l := Load()
@@ -454,6 +469,9 @@ func SetOff(name string, off bool) error {
 
 // SetConfig sets the OpenCode config the plugins are handed.
 func SetConfig(cfg map[string]any) error {
+	if pluginsOff() {
+		return errOff
+	}
 	listMu.Lock()
 	defer listMu.Unlock()
 	l := Load()

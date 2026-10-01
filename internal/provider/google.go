@@ -38,6 +38,7 @@ import (
 	"time"
 
 	"github.com/yetone/magpie/internal/catalog"
+	"github.com/yetone/magpie/internal/cypheria"
 	"github.com/yetone/magpie/internal/edit"
 )
 
@@ -135,6 +136,9 @@ type googleAccount struct {
 
 // geminiDir is where Gemini CLI keeps its sign-in.
 func geminiDir() string {
+	if h := cypheria.Native("gemini", "GEMINI_CLI_HOME"); h != "" {
+		return filepath.Join(h, ".gemini")
+	}
 	home, _ := os.UserHomeDir()
 	return filepath.Join(home, ".gemini")
 }
