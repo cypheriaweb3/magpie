@@ -27,12 +27,16 @@ import (
 	"time"
 
 	"github.com/yetone/magpie/internal/catalog"
+	"github.com/yetone/magpie/internal/cypheria"
 	"github.com/yetone/magpie/internal/netproxy"
 	"github.com/yetone/magpie/internal/proc"
 )
 
 // GrokExecutable finds the Grok Build CLI; a var so tests can fake it.
 var GrokExecutable = func() string {
+	if p, managed := managedCLI("grok"); managed {
+		return p
+	}
 	home, _ := os.UserHomeDir()
 	path := append(filepath.SplitList(os.Getenv("PATH")), registryPath()...)
 	for _, c := range grokCandidates(runtime.GOOS, home, GrokHome(), os.Getenv("GROK_BIN_DIR"), path) {
@@ -111,7 +115,7 @@ func isGrokBuild(path string) bool {
 
 // GrokHome is where the CLI keeps its sign-in and settings.
 func GrokHome() string {
-	if h := os.Getenv("GROK_HOME"); h != "" {
+	if h := cypheria.Getenv("grok", "GROK_HOME"); h != "" {
 		return h
 	}
 	home, _ := os.UserHomeDir()
@@ -379,7 +383,7 @@ func grokVersion() string {
 	v := grokClientVersion
 	if exe := GrokExecutable(); exe != "" {
 		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-		if out, err := proc.CommandContext(ctx, exe, "--version").Output(); err == nil { // "grok 1.0.41 (4220f3b224a6)"
+		if out, err := cliCommand(ctx, "grok", exe, nil, "--version").Output(); err == nil { // "grok 1.0.41 (4220f3b224a6)"
 			if c := grokSemver.FindString(string(out)); c != "" && compareClaudeVersion(c, v) > 0 {
 				v = c
 			}
@@ -466,9 +470,8 @@ func grokAccessToken(home, binary string, expired bool) (grokCredential, error) 
 	if ok && (expired || time.Until(c.ExpiresAt) < grokRefreshMargin) && binary != "" {
 		grokRefresh.Lock()
 		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
-		cmd := proc.CommandContext(ctx, binary, "models")
+		cmd := cliCommand(ctx, "grok", binary, netproxy.Env(grokOwnEnv(os.Environ(), home)), "models")
 		cmd.Dir = filepath.Dir(home)
-		cmd.Env = netproxy.Env(grokOwnEnv(os.Environ(), home))
 		_ = cmd.Run()
 		cancel()
 		grokRefresh.Unlock()
@@ -547,9 +550,10 @@ func agentCommand(ctx context.Context, path string, args ...string) *exec.Cmd {
 // lines after it that are nothing but more of it are joined on.
 func runCLISignIn(s *signInFlow, what string, env []string, using bool, failed func(), identity func() (user, plan string, ok bool), whole func(link string) bool, path string, args ...string) error {
 	ctx, cancel := context.WithCancel(context.Background())
-	cmd := proc.CommandContext(ctx, path, args...)
-	cmd.Dir, _ = os.UserHomeDir()
-	cmd.Env = netproxy.Env(env)
+	cmd := cliCommand(ctx, s.st.Agent, path, netproxy.Env(env), args...)
+	if _, managed := cypheria.Spec(s.st.Agent); !managed {
+		cmd.Dir, _ = os.UserHomeDir()
+	}
 	out, err := cmd.StdoutPipe()
 	if err != nil {
 		cancel()

@@ -244,9 +244,8 @@ func codexDaemonCommand(ctx context.Context, verb string) (*exec.Cmd, error) {
 	if exe == "" {
 		return nil, errors.New("the codex CLI isn't installed, or magpie can't find it")
 	}
-	cmd := proc.CommandContext(ctx, exe, "app-server", "daemon", verb)
 	env := slices.DeleteFunc(os.Environ(), func(kv string) bool { return strings.HasPrefix(kv, "CODEX_HOME=") })
-	cmd.Env = append(env, "CODEX_HOME="+codexHome())
+	cmd := cliCommand(ctx, "codex", exe, append(env, "CODEX_HOME="+codexHome()), "app-server", "daemon", verb)
 	cmd.Stdin = nil // os/exec reads it from the null device
 	return cmd, nil
 }

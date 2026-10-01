@@ -60,7 +60,7 @@ func agyCustom(path string) map[string]json.RawMessage {
 }
 
 func agy(home string) *Agent {
-	dir := filepath.Join(home, ".gemini", "antigravity-cli")
+	dir := filepath.Join(agyHomeOf(home), "antigravity-cli")
 	path := filepath.Join(dir, "settings.json")
 	get := jsonGet(path, "model")
 	provider := jsonGet(path, "modelProvider")

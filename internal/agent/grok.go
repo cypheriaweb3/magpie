@@ -16,12 +16,12 @@ package agent
 // gives them back.
 
 import (
-	"os"
 	"path/filepath"
 	"strconv"
 	"strings"
 
 	"github.com/yetone/magpie/internal/catalog"
+	"github.com/yetone/magpie/internal/cypheria"
 	"github.com/yetone/magpie/internal/edit"
 	"github.com/yetone/magpie/internal/gateway"
 )
@@ -60,7 +60,7 @@ func grokModelTables() []edit.Table {
 }
 
 func grok(home string) *Agent {
-	dir := os.Getenv("GROK_HOME")
+	dir := cypheria.Getenv("grok", "GROK_HOME")
 	if dir == "" {
 		dir = filepath.Join(home, ".grok")
 	}

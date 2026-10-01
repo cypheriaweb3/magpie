@@ -136,6 +136,9 @@ func LastUpdated(pkg string, since time.Time) (Updated, bool) {
 // waiting. The plugins updated are loaded again, a reply streaming
 // through the old ones finishing first.
 func CheckUpdates(ctx context.Context) (Updates, error) {
+	if pluginsOff() {
+		return PendingUpdates(), errOff
+	}
 	var es []Entry
 	var names []string
 	for _, e := range Load().Plugins {
@@ -200,6 +203,9 @@ func CheckUpdates(ctx context.Context) (Updates, error) {
 // every updateEvery, run by the magpie serving the gateway (one magpie,
 // never two at once).
 func KeepUpdated(ctx context.Context) {
+	if pluginsOff() {
+		return
+	}
 	t := time.NewTimer(30 * time.Second)
 	defer t.Stop()
 	for {

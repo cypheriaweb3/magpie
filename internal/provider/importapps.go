@@ -20,6 +20,8 @@ import (
 
 	"github.com/tidwall/jsonc"
 	_ "modernc.org/sqlite"
+
+	"github.com/yetone/magpie/internal/cypheria"
 )
 
 // AppSource is one app magpie can import from, with what it holds.
@@ -364,7 +366,7 @@ func fileExists(p string) bool {
 }
 
 func claudeSettingsPath() string {
-	if dir := os.Getenv("CLAUDE_CONFIG_DIR"); dir != "" {
+	if dir := cypheria.Getenv("claude", "CLAUDE_CONFIG_DIR"); dir != "" {
 		return filepath.Join(dir, "settings.json")
 	}
 	home, _ := os.UserHomeDir()

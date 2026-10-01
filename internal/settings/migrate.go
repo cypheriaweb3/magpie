@@ -4,6 +4,8 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+
+	"github.com/yetone/magpie/internal/cypheria"
 )
 
 // Migrate carries the files of an install that predates the name over:
@@ -12,6 +14,9 @@ import (
 // running keeps working, and it only fills folders that do not exist yet.
 // The old folders can be deleted once nothing uses them.
 func Migrate() {
+	if cypheria.Home() != "" {
+		return // MAGPIE_HOME is magpie's alone; there was never a dial there
+	}
 	copyTree(filepath.Join(filepath.Dir(Dir()), "dial"), Dir())
 	cache := os.Getenv("XDG_CACHE_HOME")
 	if cache == "" {

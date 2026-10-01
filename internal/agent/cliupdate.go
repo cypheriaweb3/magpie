@@ -25,6 +25,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/yetone/magpie/internal/cypheria"
 	"github.com/yetone/magpie/internal/netproxy"
 	"github.com/yetone/magpie/internal/proc"
 )
@@ -502,6 +503,9 @@ func (a *Agent) cliBin() (string, cliSpec) {
 // CLI is the agent's CLI: its version, the newest, and whether magpie can
 // update it. ok is false for an agent without a CLI magpie knows.
 func (a *Agent) CLI() (c CLI, ok bool) {
+	if _, managed := cypheria.Spec(a.ID); managed {
+		return a.managedCLI()
+	}
 	bin, spec := a.cliBin()
 	if bin == "" {
 		return CLI{}, false
@@ -590,6 +594,10 @@ var updateTimeout = 10 * time.Minute
 // UpdateCLI brings the agent's CLI up to date the way it was installed, and
 // says what it is afterwards.
 func (a *Agent) UpdateCLI() (CLI, error) {
+	if _, managed := cypheria.Spec(a.ID); managed {
+		c, _ := a.managedCLI()
+		return c, fmt.Errorf("%s is installed and updated by Cypheria, not by magpie", a.Name)
+	}
 	bin, spec := a.cliBin()
 	if bin == "" {
 		return CLI{}, fmt.Errorf("magpie can't find %s's CLI", a.Name)

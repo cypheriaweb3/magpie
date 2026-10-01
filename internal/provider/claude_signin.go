@@ -22,7 +22,6 @@ import (
 	"time"
 
 	"github.com/yetone/magpie/internal/netproxy"
-	"github.com/yetone/magpie/internal/proc"
 )
 
 // claudeCLISignIn is a `claude auth login` magpie is running.
@@ -92,9 +91,8 @@ func startClaudeSignIn(s *signInFlow) error {
 	opened := filepath.Join(dir, ".opened-url")
 	env := append(claudeSignInEnv(os.Environ(), dir), "BROWSER="+claudeURLOpener(), openedURLEnv+"="+opened)
 	ctx, cancel := context.WithCancel(context.Background())
-	cmd := proc.CommandContext(ctx, path, "auth", "login", "--claudeai")
+	cmd := cliCommand(ctx, "claude", path, netproxy.Env(env), "auth", "login", "--claudeai")
 	cmd.Dir = dir
-	cmd.Env = netproxy.Env(env)
 	in, err := cmd.StdinPipe()
 	if err != nil {
 		cancel()
@@ -228,9 +226,8 @@ func claudeSignedIn(path, dir string) (savedLogin, error) {
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
 	defer cancel()
-	cmd := proc.CommandContext(ctx, path, "auth", "status", "--json")
+	cmd := cliCommand(ctx, "claude", path, claudeSignInEnv(os.Environ(), dir), "auth", "status", "--json")
 	cmd.Dir = dir
-	cmd.Env = claudeSignInEnv(os.Environ(), dir)
 	b, _ := cmd.Output()
 	var status struct {
 		Email            string `json:"email"`

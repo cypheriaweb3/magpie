@@ -30,6 +30,7 @@ import (
 	"time"
 
 	"github.com/yetone/magpie/internal/catalog"
+	"github.com/yetone/magpie/internal/cypheria"
 	"github.com/yetone/magpie/internal/provider"
 	"github.com/yetone/magpie/internal/settings"
 )
@@ -291,7 +292,7 @@ type file struct {
 
 // ClaudeDir is Claude Code's folder: $CLAUDE_CONFIG_DIR, else ~/.claude.
 func ClaudeDir() string {
-	if d := os.Getenv("CLAUDE_CONFIG_DIR"); d != "" {
+	if d := cypheria.Getenv("claude", "CLAUDE_CONFIG_DIR"); d != "" {
 		return d
 	}
 	home, _ := os.UserHomeDir()
@@ -300,7 +301,7 @@ func ClaudeDir() string {
 
 // CodexDir is Codex's folder: $CODEX_HOME, else ~/.codex.
 func CodexDir() string {
-	if d := os.Getenv("CODEX_HOME"); d != "" {
+	if d := cypheria.Getenv("codex", "CODEX_HOME"); d != "" {
 		return d
 	}
 	home, _ := os.UserHomeDir()
@@ -344,10 +345,20 @@ func ccFiles(agent, dir string) []file {
 // allFiles are every agent's session files.
 func allFiles() []file {
 	var out []file
-	for _, fs := range [][]file{claudeFiles(), codexFiles(), openCodeFiles(), piFiles(),
-		zcodeFiles(), dshFiles(), clineFiles(), ccFiles("qoder", QoderDir("qoder")), ccFiles("qoder-cn", QoderDir("qoder-cn")),
-		grokFiles(), workbuddyFiles(), ompFiles()} {
-		out = append(out, fs...)
+	for _, r := range []struct {
+		agent string
+		files func() []file
+	}{
+		{"claude", claudeFiles}, {"codex", codexFiles}, {"opencode", openCodeFiles}, {"pi", piFiles},
+		{"zcode", zcodeFiles}, {"dsh", dshFiles}, {"cline", clineFiles},
+		{"qoder", func() []file { return ccFiles("qoder", QoderDir("qoder")) }},
+		{"qoder-cn", func() []file { return ccFiles("qoder-cn", QoderDir("qoder-cn")) }},
+		{"grok", grokFiles}, {"workbuddy", workbuddyFiles}, {"omp", ompFiles},
+	} {
+		// in integration mode, only the agents Cypheria manages
+		if cypheria.AgentAllowed(r.agent) {
+			out = append(out, r.files()...)
+		}
 	}
 	return out
 }
@@ -355,19 +366,27 @@ func allFiles() []file {
 // Dirs are the folders the sessions are read from: Claude Code's and
 // Codex's, and the other agents' where they keep sessions on this computer.
 func Dirs() []string {
-	out := []string{ClaudeDir(), CodexDir()}
-	for _, d := range []struct{ dir, sessions string }{
-		{OpenCodeDir(), OpenCodeDir()},
-		{PiDir(), PiDir()},
-		{ZCodeDir(), zcodeDB()},
-		{DshDir(), filepath.Join(DshDir(), "sessions")},
-		{ClineSessionDir(), ClineSessionDir()},
-		{QoderDir("qoder"), filepath.Join(QoderDir("qoder"), "projects")},
-		{QoderDir("qoder-cn"), filepath.Join(QoderDir("qoder-cn"), "projects")},
-		{GrokDir(), filepath.Join(GrokDir(), "sessions")},
-		{WorkBuddyDir(), filepath.Join(WorkBuddyDir(), "projects")},
-		{OmpDir(), filepath.Join(OmpDir(), "sessions")},
+	var out []string
+	for _, a := range []string{"claude", "codex"} {
+		if cypheria.AgentAllowed(a) {
+			out = append(out, map[string]string{"claude": ClaudeDir(), "codex": CodexDir()}[a])
+		}
+	}
+	for _, d := range []struct{ agent, dir, sessions string }{
+		{"opencode", OpenCodeDir(), OpenCodeDir()},
+		{"pi", PiDir(), PiDir()},
+		{"zcode", ZCodeDir(), zcodeDB()},
+		{"dsh", DshDir(), filepath.Join(DshDir(), "sessions")},
+		{"cline", ClineSessionDir(), ClineSessionDir()},
+		{"qoder", QoderDir("qoder"), filepath.Join(QoderDir("qoder"), "projects")},
+		{"qoder-cn", QoderDir("qoder-cn"), filepath.Join(QoderDir("qoder-cn"), "projects")},
+		{"grok", GrokDir(), filepath.Join(GrokDir(), "sessions")},
+		{"workbuddy", WorkBuddyDir(), filepath.Join(WorkBuddyDir(), "projects")},
+		{"omp", OmpDir(), filepath.Join(OmpDir(), "sessions")},
 	} {
+		if !cypheria.AgentAllowed(d.agent) {
+			continue
+		}
 		if _, err := os.Stat(d.sessions); err == nil {
 			out = append(out, d.dir)
 		}

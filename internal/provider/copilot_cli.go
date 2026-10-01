@@ -22,6 +22,7 @@ import (
 
 	"github.com/tidwall/jsonc"
 
+	"github.com/yetone/magpie/internal/cypheria"
 	"github.com/yetone/magpie/internal/proc"
 )
 
@@ -44,7 +45,7 @@ type copilotCLIUser struct {
 
 // copilotCLIHome is where the CLI keeps its settings.
 func copilotCLIHome() string {
-	if h := os.Getenv("COPILOT_HOME"); h != "" {
+	if h := cypheria.Getenv("copilot", "COPILOT_HOME"); h != "" {
 		return h
 	}
 	home, _ := os.UserHomeDir()

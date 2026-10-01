@@ -23,10 +23,14 @@ import (
 	toml "github.com/pelletier/go-toml/v2"
 
 	"github.com/yetone/magpie/internal/catalog"
+	"github.com/yetone/magpie/internal/cypheria"
 )
 
 // DevinExecutable finds the devin CLI; a var so tests can fake it.
 var DevinExecutable = func() string {
+	if p, managed := managedCLI("devin"); managed {
+		return p
+	}
 	if p, err := exec.LookPath("devin"); err == nil {
 		return p
 	}
@@ -42,11 +46,11 @@ var DevinExecutable = func() string {
 // DevinCredentialsPath is where the CLI keeps its sign-in.
 func DevinCredentialsPath() string {
 	if runtime.GOOS == "windows" {
-		if app := os.Getenv("APPDATA"); app != "" {
+		if app := cypheria.Getenv("devin", "APPDATA"); app != "" {
 			return filepath.Join(app, "devin", "credentials.toml")
 		}
 	}
-	base := os.Getenv("XDG_DATA_HOME")
+	base := cypheria.Getenv("devin", "XDG_DATA_HOME")
 	if base == "" {
 		home, _ := os.UserHomeDir()
 		base = filepath.Join(home, ".local", "share")

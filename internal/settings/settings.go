@@ -21,6 +21,7 @@ import (
 	"time"
 
 	"github.com/yetone/magpie/internal/catalog"
+	"github.com/yetone/magpie/internal/cypheria"
 	"github.com/yetone/magpie/internal/redact"
 )
 
@@ -429,6 +430,9 @@ func renameInMap(m reflect.Value, from, to string) bool {
 
 // Path is the settings file.
 func Path() string {
+	if d, ok := cypheria.ConfigDir(); ok {
+		return filepath.Join(d, "settings.json")
+	}
 	if x := os.Getenv("XDG_CONFIG_HOME"); x != "" {
 		return filepath.Join(x, "magpie", "settings.json")
 	}

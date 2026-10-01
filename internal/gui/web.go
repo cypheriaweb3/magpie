@@ -88,7 +88,7 @@ func StartWeb(addr, version string) (*Web, error) {
 	quit := func() { once.Do(func() { close(w.quit) }) }
 	w.Link = "http://" + net.JoinHostPort(host, port) + "/?k=" + url.QueryEscape(key)
 	w.srv = &http.Server{
-		Handler:           webGuard("magpie_web_"+port, key, keep, Handler(webHost{quit}, startBackend())),
+		Handler:           webGuard("magpie_web_"+port, key, keep, withOpenAPI(Handler(webHost{quit}, startBackend()))),
 		ReadHeaderTimeout: 30 * time.Second,
 	}
 	go w.srv.Serve(ln)
@@ -150,7 +150,8 @@ func webKey() (key string, fixed bool, err error) {
 
 // webGuard lets through requests with the key: in the link's k, which it
 // trades for a cookie (kept for keep, or the browser session when 0) and
-// a clean address, or in that cookie.
+// a clean address, or in that cookie, or — for a program calling the API
+// (openapi.go) — as a bearer token.
 func webGuard(cookie, key string, keep time.Duration, next http.Handler) http.Handler {
 	same := func(v string) bool { return subtle.ConstantTimeCompare([]byte(v), []byte(key)) == 1 }
 	return http.HandlerFunc(func(rw http.ResponseWriter, r *http.Request) {
@@ -164,6 +165,15 @@ func webGuard(cookie, key string, keep time.Duration, next http.Handler) http.Ha
 			u := *r.URL
 			u.RawQuery = q.Encode()
 			http.Redirect(rw, r, u.RequestURI(), http.StatusSeeOther)
+			return
+		}
+		if scheme, token, ok := strings.Cut(r.Header.Get("Authorization"), " "); ok && strings.EqualFold(scheme, "Bearer") {
+			if !same(token) {
+				rw.Header().Set("WWW-Authenticate", "Bearer")
+				http.Error(rw, "this bearer token is not this magpie web's key", http.StatusUnauthorized)
+				return
+			}
+			next.ServeHTTP(rw, r)
 			return
 		}
 		if c, err := r.Cookie(cookie); err != nil || !same(c.Value) {

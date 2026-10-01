@@ -68,7 +68,7 @@ func codex(home string) *Agent { return codexIn(here(home)) }
 // codexIn is Codex as it lives at a place: this machine's home, or a WSL
 // distro's (see wsl.go).
 func codexIn(at place) *Agent {
-	dir := filepath.Join(at.home, ".codex")
+	dir := codexHomeOf(at)
 	path := filepath.Join(dir, "config.toml")
 	catalogPath := filepath.Join(dir, "magpie-models.json")
 	get := func(k string) string { v, _ := edit.GetTOMLTop(path, k); return v }

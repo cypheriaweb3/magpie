@@ -1,0 +1,2693 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "Magpie API",
+    "version": "unversioned",
+    "description": "The API of Magpie's window, served by `magpie web` for programs that run and drive it. Send the web key (MAGPIE_WEB_KEY) as a bearer token. Magpie's own page authenticates with a cookie instead. `magpie web` is on a machine its caller may not be at, so it performs no desktop actions: the caller opens URLs, copies text and shows files itself. With MAGPIE_AGENTS_FILE (Cypheria integration mode) the agents, sessions and subscriptions are only those of the agents in that file, and plugins are off; see the README."
+  },
+  "servers": [{ "url": "/" }],
+  "security": [{ "bearerAuth": [] }],
+  "tags": [
+    { "name": "State" },
+    { "name": "Providers" },
+    { "name": "Accounts" },
+    { "name": "Groups" },
+    { "name": "Library" },
+    { "name": "Usage" },
+    { "name": "Backup" },
+    { "name": "Sessions" },
+    { "name": "Plugins" },
+    { "name": "Settings" },
+    {
+      "name": "Host",
+      "description": "Desktop-host conveniences. `magpie web` does not perform them; the calling application owns these actions."
+    },
+    { "name": "Update" }
+  ],
+  "paths": {
+    "/openapi.json": {
+      "get": {
+        "operationId": "getOpenAPI",
+        "summary": "Get this OpenAPI document",
+        "tags": ["State"],
+        "responses": {
+          "200": {
+            "description": "OpenAPI 3.1 JSON",
+            "content": { "application/json": { "schema": { "type": "object" } } }
+          },
+          "401": { "$ref": "#/components/responses/Unauthorized" }
+        }
+      }
+    },
+    "/api/state": {
+      "get": {
+        "operationId": "getState",
+        "summary": "Get detected agents, profiles, catalog source and settings",
+        "tags": ["State"],
+        "responses": {
+          "200": { "$ref": "#/components/responses/State" },
+          "401": { "$ref": "#/components/responses/Unauthorized" }
+        }
+      }
+    },
+    "/api/set": {
+      "post": {
+        "operationId": "setAgentField",
+        "summary": "Set a detected agent field",
+        "tags": ["State"],
+        "requestBody": {
+          "required": true,
+          "content": { "application/json": { "schema": { "$ref": "#/components/schemas/AgentFieldChange" } } }
+        },
+        "responses": {
+          "200": { "$ref": "#/components/responses/State" },
+          "400": { "$ref": "#/components/responses/BadRequest" },
+          "401": { "$ref": "#/components/responses/Unauthorized" }
+        }
+      }
+    },
+    "/api/drift": {
+      "get": {
+        "operationId": "getAgentDrift",
+        "summary": "Get externally changed agent configurations",
+        "tags": ["State"],
+        "responses": {
+          "200": { "$ref": "#/components/responses/JSONObject" },
+          "401": { "$ref": "#/components/responses/Unauthorized" }
+        }
+      }
+    },
+    "/api/agents/{action}/{id}": {
+      "post": {
+        "operationId": "resolveAgentDrift",
+        "summary": "Reapply Magpie's configuration or keep the agent's current value",
+        "tags": ["State"],
+        "parameters": [
+          {
+            "name": "action",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "string", "enum": ["reapply", "keep"] }
+          },
+          { "name": "id", "in": "path", "required": true, "schema": { "type": "string" } }
+        ],
+        "responses": {
+          "200": { "$ref": "#/components/responses/State" },
+          "400": { "$ref": "#/components/responses/BadRequest" },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "404": { "$ref": "#/components/responses/NotFound" }
+        }
+      }
+    },
+    "/api/agents/arrange": {
+      "post": {
+        "operationId": "arrangeAgents",
+        "summary": "Save agent order and collapsed sections",
+        "tags": ["Settings"],
+        "requestBody": {
+          "required": true,
+          "content": { "application/json": { "schema": { "$ref": "#/components/schemas/AgentArrangement" } } }
+        },
+        "responses": {
+          "200": { "$ref": "#/components/responses/SettingsState" },
+          "400": { "$ref": "#/components/responses/BadRequest" },
+          "401": { "$ref": "#/components/responses/Unauthorized" }
+        }
+      }
+    },
+    "/api/profile/{action}": {
+      "post": {
+        "operationId": "changeProfile",
+        "summary": "Save, apply or delete a profile",
+        "tags": ["State"],
+        "parameters": [
+          {
+            "name": "action",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "string", "enum": ["save", "use", "delete"] }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": { "application/json": { "schema": { "$ref": "#/components/schemas/NameRequest" } } }
+        },
+        "responses": {
+          "200": { "$ref": "#/components/responses/JSONObject" },
+          "400": { "$ref": "#/components/responses/BadRequest" },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "404": { "$ref": "#/components/responses/NotFound" }
+        }
+      }
+    },
+    "/api/sync": {
+      "post": {
+        "operationId": "syncCatalog",
+        "summary": "Refresh the catalog and ready providers' live model lists",
+        "tags": ["State"],
+        "responses": {
+          "200": { "$ref": "#/components/responses/State" },
+          "400": { "$ref": "#/components/responses/BadRequest" },
+          "401": { "$ref": "#/components/responses/Unauthorized" }
+        }
+      }
+    },
+    "/api/settings": {
+      "get": {
+        "operationId": "getSettings",
+        "summary": "Get settings and runtime paths",
+        "tags": ["Settings"],
+        "responses": {
+          "200": { "$ref": "#/components/responses/SettingsState" },
+          "401": { "$ref": "#/components/responses/Unauthorized" }
+        }
+      },
+      "post": {
+        "operationId": "saveSettings",
+        "summary": "Replace editable settings",
+        "description": "Agent arrangement and window geometry are retained from the current settings.",
+        "tags": ["Settings"],
+        "requestBody": {
+          "required": true,
+          "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Settings" } } }
+        },
+        "responses": {
+          "200": { "$ref": "#/components/responses/SettingsState" },
+          "400": { "$ref": "#/components/responses/BadRequest" },
+          "401": { "$ref": "#/components/responses/Unauthorized" }
+        }
+      }
+    },
+    "/api/settings/login": {
+      "post": {
+        "operationId": "setOpenAtLogin",
+        "summary": "Enable or disable opening Magpie at login",
+        "description": "Changes the autostart entry of the machine Magpie runs on.",
+        "tags": ["Settings"],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "type": "object", "required": ["on"], "properties": { "on": { "type": "boolean" } } }
+            }
+          }
+        },
+        "responses": {
+          "200": { "$ref": "#/components/responses/SettingsState" },
+          "400": { "$ref": "#/components/responses/BadRequest" },
+          "401": { "$ref": "#/components/responses/Unauthorized" }
+        }
+      }
+    },
+    "/api/settings/lan": {
+      "post": {
+        "operationId": "setGatewayLAN",
+        "summary": "Share the gateway on the local network",
+        "description": "Turning sharing on creates a LAN key the first time; `newKey` replaces it, and the previous key stops working. The gateway listener is restarted.",
+        "tags": ["Settings"],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["on"],
+                "properties": { "on": { "type": "boolean" }, "newKey": { "type": "boolean" } }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": { "$ref": "#/components/responses/SettingsState" },
+          "400": { "$ref": "#/components/responses/BadRequest" },
+          "401": { "$ref": "#/components/responses/Unauthorized" }
+        }
+      }
+    },
+    "/api/settings/update-skip": {
+      "post": {
+        "operationId": "setUpdateSkip",
+        "summary": "Skip an update version",
+        "description": "Saved in settings. Cypheria builds never update themselves, so it has no effect there.",
+        "tags": ["Settings"],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["version"],
+                "properties": { "version": { "type": "string" } }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": { "$ref": "#/components/responses/SettingsState" },
+          "400": { "$ref": "#/components/responses/BadRequest" },
+          "401": { "$ref": "#/components/responses/Unauthorized" }
+        }
+      }
+    },
+    "/api/settings/plain-names": {
+      "post": {
+        "operationId": "setPlainNames",
+        "summary": "Name models in agents' lists without their provider",
+        "tags": ["Settings"],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "type": "object", "required": ["on"], "properties": { "on": { "type": "boolean" } } }
+            }
+          }
+        },
+        "responses": {
+          "200": { "$ref": "#/components/responses/SettingsState" },
+          "400": { "$ref": "#/components/responses/BadRequest" },
+          "401": { "$ref": "#/components/responses/Unauthorized" }
+        }
+      }
+    },
+    "/api/settings/codex-auto-reset": {
+      "post": {
+        "operationId": "setCodexAutoReset",
+        "summary": "Let a Codex account spend a rate-limit reset by itself",
+        "description": "When on, the account spends one of its resets once its week is used up.",
+        "tags": ["Settings", "Accounts"],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["user", "on"],
+                "properties": { "user": { "type": "string" }, "on": { "type": "boolean" } }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": { "$ref": "#/components/responses/SettingsState" },
+          "400": { "$ref": "#/components/responses/BadRequest" },
+          "401": { "$ref": "#/components/responses/Unauthorized" }
+        }
+      }
+    },
+    "/api/settings/reveal": {
+      "post": {
+        "operationId": "revealSettings",
+        "summary": "Reveal the settings directory",
+        "description": "Unsupported by `magpie web`. Read `dir` from GET /api/settings and let the calling application handle it.",
+        "tags": ["Host"],
+        "responses": {
+          "400": { "$ref": "#/components/responses/HostUnavailable" },
+          "401": { "$ref": "#/components/responses/Unauthorized" }
+        }
+      }
+    },
+    "/api/agents/cli": {
+      "get": {
+        "operationId": "listAgentCLIs",
+        "summary": "Get installed and latest agent CLI versions",
+        "tags": ["State"],
+        "responses": {
+          "200": {
+            "description": "CLI versions known within a few seconds; `pending` asks the client to poll again",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "agents": { "type": "array", "items": { "type": "object" } },
+                    "pending": { "type": "boolean" }
+                  }
+                }
+              }
+            }
+          },
+          "401": { "$ref": "#/components/responses/Unauthorized" }
+        }
+      }
+    },
+    "/api/agents/cli/{id}": {
+      "post": {
+        "operationId": "updateAgentCLI",
+        "summary": "Update an agent CLI the way it was installed",
+        "description": "Runs the agent's own updater on the machine Magpie runs on. An agent in the Cypheria agents file is installed and updated by Cypheria: this is refused with 400.",
+        "tags": ["State"],
+        "parameters": [{ "name": "id", "in": "path", "required": true, "schema": { "type": "string" } }],
+        "responses": {
+          "200": { "$ref": "#/components/responses/JSONObject" },
+          "400": { "$ref": "#/components/responses/BadRequest" },
+          "401": { "$ref": "#/components/responses/Unauthorized" }
+        }
+      }
+    },
+    "/api/agent-models/{id}": {
+      "get": {
+        "operationId": "getAgentModels",
+        "summary": "List the models offered to an agent",
+        "tags": ["State"],
+        "parameters": [{ "name": "id", "in": "path", "required": true, "schema": { "type": "string" } }],
+        "responses": {
+          "200": { "$ref": "#/components/responses/JSONObject" },
+          "400": { "$ref": "#/components/responses/BadRequest" },
+          "401": { "$ref": "#/components/responses/Unauthorized" }
+        }
+      },
+      "post": {
+        "operationId": "setAgentHiddenModels",
+        "summary": "Hide models from an agent's lists",
+        "description": "`hidden` replaces the whole hidden set. A model the agent is currently set to is never hidden.",
+        "tags": ["State"],
+        "parameters": [{ "name": "id", "in": "path", "required": true, "schema": { "type": "string" } }],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": { "hidden": { "type": "array", "items": { "type": "string" } } },
+                "required": ["hidden"]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": { "$ref": "#/components/responses/JSONObject" },
+          "400": { "$ref": "#/components/responses/BadRequest" },
+          "401": { "$ref": "#/components/responses/Unauthorized" }
+        }
+      }
+    },
+    "/api/settings/quota-left": {
+      "post": {
+        "operationId": "setQuotaLeft",
+        "summary": "Show usage as remaining instead of used",
+        "tags": ["Settings"],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "type": "object", "properties": { "on": { "type": "boolean" } }, "required": ["on"] }
+            }
+          }
+        },
+        "responses": {
+          "200": { "$ref": "#/components/responses/SettingsState" },
+          "400": { "$ref": "#/components/responses/BadRequest" },
+          "401": { "$ref": "#/components/responses/Unauthorized" }
+        }
+      }
+    },
+    "/api/settings/text-size": {
+      "post": {
+        "operationId": "setTextSize",
+        "summary": "Set the window text size",
+        "description": "Saved in settings; `magpie web` has no window to resize.",
+        "tags": ["Settings"],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": { "size": { "type": "integer", "description": "Percent" } },
+                "required": ["size"]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": { "$ref": "#/components/responses/SettingsState" },
+          "400": { "$ref": "#/components/responses/BadRequest" },
+          "401": { "$ref": "#/components/responses/Unauthorized" }
+        }
+      }
+    },
+    "/api/settings/redact-rules": {
+      "post": {
+        "operationId": "setRedactRules",
+        "summary": "Replace the user's masking rules",
+        "tags": ["Settings"],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "rules": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "required": ["kind"],
+                      "properties": {
+                        "kind": { "type": "string" },
+                        "prefix": { "type": "string" },
+                        "regex": { "type": "string", "description": "RE2 pattern; group 1 is masked when present" }
+                      }
+                    }
+                  }
+                },
+                "required": ["rules"]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": { "$ref": "#/components/responses/SettingsState" },
+          "400": { "$ref": "#/components/responses/BadRequest" },
+          "401": { "$ref": "#/components/responses/Unauthorized" }
+        }
+      }
+    },
+    "/api/omarchy": {
+      "get": {
+        "operationId": "getOmarchyTheme",
+        "summary": "Get the current Omarchy theme",
+        "tags": ["Settings"],
+        "responses": {
+          "200": {
+            "description": "The theme, or null when Magpie does not run on Omarchy",
+            "content": { "application/json": { "schema": { "type": ["object", "null"] } } }
+          },
+          "401": { "$ref": "#/components/responses/Unauthorized" }
+        }
+      }
+    },
+    "/api/omarchy/widget": {
+      "get": {
+        "operationId": "getOmarchyWidget",
+        "summary": "Get the Omarchy bar icon state",
+        "description": "Always unavailable in `magpie web`.",
+        "tags": ["Host"],
+        "responses": {
+          "200": {
+            "description": "Availability and state",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": { "available": { "type": "boolean" }, "on": { "type": "boolean" } }
+                }
+              }
+            }
+          },
+          "401": { "$ref": "#/components/responses/Unauthorized" }
+        }
+      },
+      "post": {
+        "operationId": "setOmarchyWidget",
+        "summary": "Add or remove Magpie's icon in Omarchy's bar",
+        "tags": ["Host"],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "type": "object", "properties": { "on": { "type": "boolean" } }, "required": ["on"] }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Availability and state",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": { "available": { "type": "boolean" }, "on": { "type": "boolean" } }
+                }
+              }
+            }
+          },
+          "400": { "$ref": "#/components/responses/BadRequest" },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "409": { "description": "Omarchy's bar is unavailable, as it always is in `magpie web`" }
+        }
+      }
+    },
+    "/api/library/skills/check": {
+      "post": {
+        "operationId": "checkSkills",
+        "summary": "Check installed skills for upstream changes",
+        "description": "Answers with the library view, each skill carrying what the check found.",
+        "tags": ["Library"],
+        "responses": {
+          "200": { "$ref": "#/components/responses/JSONObject" },
+          "400": { "$ref": "#/components/responses/BadRequest" },
+          "401": { "$ref": "#/components/responses/Unauthorized" }
+        }
+      }
+    },
+    "/api/library/rtk/upgrade": {
+      "post": {
+        "operationId": "upgradeRTK",
+        "summary": "Upgrade RTK",
+        "description": "Upgrades RTK on the machine Magpie runs on and returns its status by agent. Refused with 400 in Cypheria integration mode.",
+        "tags": ["Library"],
+        "responses": {
+          "200": { "$ref": "#/components/responses/JSONObject" },
+          "400": { "$ref": "#/components/responses/BadRequest" },
+          "401": { "$ref": "#/components/responses/Unauthorized" }
+        }
+      }
+    },
+    "/api/library/projects/choose": {
+      "post": {
+        "operationId": "chooseLibraryProject",
+        "summary": "Choose a project folder in the system picker",
+        "description": "Unsupported by `magpie web`. The calling application chooses the folder itself.",
+        "tags": ["Host", "Library"],
+        "responses": {
+          "400": { "$ref": "#/components/responses/HostUnavailable" },
+          "401": { "$ref": "#/components/responses/Unauthorized" }
+        }
+      }
+    },
+    "/api/sessions/stats": {
+      "get": {
+        "operationId": "getSessionStats",
+        "summary": "Get session usage by day",
+        "tags": ["Sessions"],
+        "parameters": [
+          {
+            "name": "days",
+            "in": "query",
+            "required": false,
+            "schema": { "type": "integer" },
+            "description": "Days to cover; 0 or absent for all"
+          }
+        ],
+        "responses": {
+          "200": { "$ref": "#/components/responses/JSONObject" },
+          "401": { "$ref": "#/components/responses/Unauthorized" }
+        }
+      }
+    },
+    "/api/sessions/overview": {
+      "get": {
+        "operationId": "getSessionOverview",
+        "summary": "Summarize sessions in a range",
+        "tags": ["Sessions"],
+        "parameters": [
+          { "name": "days", "in": "query", "required": false, "schema": { "type": "integer" } },
+          { "name": "agent", "in": "query", "required": false, "schema": { "type": "string" } },
+          { "name": "model", "in": "query", "required": false, "schema": { "type": "string" } },
+          { "name": "cwd", "in": "query", "required": false, "schema": { "type": "string" } }
+        ],
+        "responses": {
+          "200": { "$ref": "#/components/responses/JSONObject" },
+          "401": { "$ref": "#/components/responses/Unauthorized" }
+        }
+      }
+    },
+    "/api/sessions/progress": {
+      "get": {
+        "operationId": "getSessionIndexing",
+        "summary": "Get session indexing progress",
+        "tags": ["Sessions"],
+        "responses": {
+          "200": { "$ref": "#/components/responses/JSONObject" },
+          "401": { "$ref": "#/components/responses/Unauthorized" }
+        }
+      }
+    },
+    "/api/sessions/one": {
+      "get": {
+        "operationId": "getSession",
+        "summary": "Get one session by its stats key",
+        "tags": ["Sessions"],
+        "parameters": [{ "name": "key", "in": "query", "required": true, "schema": { "type": "string" } }],
+        "responses": {
+          "200": { "$ref": "#/components/responses/JSONObject" },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "404": { "$ref": "#/components/responses/NotFound" }
+        }
+      }
+    },
+    "/api/codex/daemon/{action}": {
+      "post": {
+        "operationId": "codexDaemonAction",
+        "summary": "Restart or dismiss Codex's background app-server",
+        "description": "`restart` ends the Codex sessions on the daemon so it picks up the switched account; `dismiss` leaves it running.",
+        "tags": ["Accounts"],
+        "parameters": [
+          {
+            "name": "action",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "string", "enum": ["restart", "dismiss"] }
+          }
+        ],
+        "responses": {
+          "200": { "$ref": "#/components/responses/ProviderState" },
+          "400": { "$ref": "#/components/responses/BadRequest" },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "404": { "$ref": "#/components/responses/NotFound" }
+        }
+      }
+    },
+    "/api/signin/{id}/callback": {
+      "post": {
+        "operationId": "submitSignInCallback",
+        "summary": "Complete a sign-in with its redirect URL",
+        "description": "For a sign-in completed in a browser that cannot reach Magpie's local callback: submit the full URL the browser was redirected to.",
+        "tags": ["Accounts"],
+        "parameters": [{ "name": "id", "in": "path", "required": true, "schema": { "type": "string" } }],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "type": "object", "properties": { "url": { "type": "string" } }, "required": ["url"] }
+            }
+          }
+        },
+        "responses": {
+          "204": { "description": "Accepted" },
+          "400": { "$ref": "#/components/responses/BadRequest" },
+          "401": { "$ref": "#/components/responses/Unauthorized" }
+        }
+      }
+    },
+    "/api/signin/import": {
+      "post": {
+        "operationId": "importSignIns",
+        "summary": "Import accounts from another tool's export",
+        "description": "Each file's text as exported; every account is verified with its vendor before it is kept. In Cypheria integration mode only those subscriptions are accepted.",
+        "tags": ["Accounts"],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "agent": { "type": "string" },
+                  "files": { "type": "array", "items": { "type": "string" } }
+                },
+                "required": ["agent", "files"]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Per-file results and the updated provider state",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "results": { "type": "array", "items": { "type": "object" } },
+                    "providers": { "$ref": "#/components/schemas/ProviderState" }
+                  }
+                }
+              }
+            }
+          },
+          "400": { "$ref": "#/components/responses/BadRequest" },
+          "401": { "$ref": "#/components/responses/Unauthorized" }
+        }
+      }
+    },
+    "/api/stepfun/{site}/session": {
+      "post": {
+        "operationId": "saveStepFunSession",
+        "summary": "Save a StepFun browser session",
+        "tags": ["Accounts"],
+        "parameters": [{ "name": "site", "in": "path", "required": true, "schema": { "type": "string" } }],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "type": "object", "properties": { "text": { "type": "string" } }, "required": ["text"] }
+            }
+          }
+        },
+        "responses": {
+          "200": { "$ref": "#/components/responses/ProviderState" },
+          "400": { "$ref": "#/components/responses/BadRequest" },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "404": { "$ref": "#/components/responses/NotFound" }
+        }
+      }
+    },
+    "/api/stepfun/{site}/signout": {
+      "post": {
+        "operationId": "signOutStepFun",
+        "summary": "Sign out of StepFun",
+        "tags": ["Accounts"],
+        "parameters": [{ "name": "site", "in": "path", "required": true, "schema": { "type": "string" } }],
+        "responses": {
+          "200": { "$ref": "#/components/responses/ProviderState" },
+          "400": { "$ref": "#/components/responses/BadRequest" },
+          "401": { "$ref": "#/components/responses/Unauthorized" }
+        }
+      }
+    },
+    "/api/plugins": {
+      "get": {
+        "operationId": "listPlugins",
+        "summary": "List provider plugins",
+        "description": "Plugins are off in Cypheria integration mode: the list is empty.",
+        "tags": ["Plugins"],
+        "responses": {
+          "200": { "$ref": "#/components/responses/JSONObject" },
+          "401": { "$ref": "#/components/responses/Unauthorized" }
+        }
+      }
+    },
+    "/api/plugins/market": {
+      "get": {
+        "operationId": "getPluginMarket",
+        "summary": "List the plugin market",
+        "description": "Empty in Cypheria integration mode.",
+        "tags": ["Plugins"],
+        "responses": {
+          "200": { "$ref": "#/components/responses/JSONObject" },
+          "401": { "$ref": "#/components/responses/Unauthorized" }
+        }
+      }
+    },
+    "/api/plugins/search": {
+      "get": {
+        "operationId": "searchPlugins",
+        "summary": "Search the plugin registry",
+        "description": "Refused with 400 in Cypheria integration mode.",
+        "tags": ["Plugins"],
+        "parameters": [{ "name": "q", "in": "query", "required": false, "schema": { "type": "string" } }],
+        "responses": {
+          "200": {
+            "description": "Matching packages",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": { "hits": { "type": "array", "items": { "type": "object" } } }
+                }
+              }
+            }
+          },
+          "400": { "$ref": "#/components/responses/BadRequest" },
+          "401": { "$ref": "#/components/responses/Unauthorized" }
+        }
+      }
+    },
+    "/api/plugins/page": {
+      "get": {
+        "operationId": "getPluginPage",
+        "summary": "Get a plugin package's readme",
+        "description": "Refused with 400 in Cypheria integration mode.",
+        "tags": ["Plugins"],
+        "parameters": [{ "name": "name", "in": "query", "required": true, "schema": { "type": "string" } }],
+        "responses": {
+          "200": { "$ref": "#/components/responses/JSONObject" },
+          "400": { "$ref": "#/components/responses/BadRequest" },
+          "401": { "$ref": "#/components/responses/Unauthorized" }
+        }
+      }
+    },
+    "/api/plugins/{op}": {
+      "post": {
+        "operationId": "changePlugins",
+        "summary": "Add, remove, update or switch off a plugin",
+        "description": "The first plugin downloads Bun; npm installs plugins on the machine Magpie runs on. `update` updates all plugins and takes no body. Refused with 400 in Cypheria integration mode.",
+        "tags": ["Plugins"],
+        "parameters": [
+          {
+            "name": "op",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "string", "enum": ["add", "remove", "update", "off"] }
+          }
+        ],
+        "requestBody": {
+          "required": false,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": { "spec": { "type": "string" }, "off": { "type": "boolean" } }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": { "$ref": "#/components/responses/JSONObject" },
+          "400": { "$ref": "#/components/responses/BadRequest" },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "404": { "$ref": "#/components/responses/NotFound" }
+        }
+      }
+    },
+    "/api/plugin-signin/prompt": {
+      "post": {
+        "operationId": "pluginSignInPrompt",
+        "summary": "Get the next question of a plugin sign-in method",
+        "description": "When `key` and `value` are given the answer is validated first; an invalid one is returned as `error` with status 200. Refused with 400 in Cypheria integration mode.",
+        "tags": ["Plugins"],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "provider": { "type": "string" },
+                  "method": { "type": "integer" },
+                  "inputs": { "type": "object", "additionalProperties": { "type": "string" } },
+                  "key": { "type": "string" },
+                  "value": { "type": "string" }
+                },
+                "required": ["provider", "method"]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": { "$ref": "#/components/responses/JSONObject" },
+          "400": { "$ref": "#/components/responses/BadRequest" },
+          "401": { "$ref": "#/components/responses/Unauthorized" }
+        }
+      }
+    },
+    "/api/plugin-signin": {
+      "post": {
+        "operationId": "startPluginSignIn",
+        "summary": "Sign in to a plugin provider",
+        "description": "For an OAuth method, open the returned `url` on the user's machine and poll GET /api/signin/{id}. Refused with 400 in Cypheria integration mode.",
+        "tags": ["Plugins"],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "provider": { "type": "string" },
+                  "method": { "type": "integer" },
+                  "inputs": { "type": "object", "additionalProperties": { "type": "string" } },
+                  "key": { "type": "string" }
+                },
+                "required": ["provider", "method"]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "A finished API-key sign-in, or an OAuth sign-in in progress",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/SignInStatus" } } }
+          },
+          "400": { "$ref": "#/components/responses/BadRequest" },
+          "401": { "$ref": "#/components/responses/Unauthorized" }
+        }
+      }
+    },
+    "/api/usage/requests": {
+      "get": {
+        "operationId": "listUsageRequests",
+        "summary": "Page through the request ledger",
+        "tags": ["Usage"],
+        "parameters": [
+          {
+            "name": "period",
+            "in": "query",
+            "required": false,
+            "schema": { "type": "string", "enum": ["today", "7d", "30d", "all"] },
+            "description": "30d when absent or unknown"
+          },
+          { "name": "agent", "in": "query", "required": false, "schema": { "type": "string" } },
+          {
+            "name": "failed",
+            "in": "query",
+            "required": false,
+            "schema": { "type": "string", "enum": ["1"] },
+            "description": "only failed requests"
+          },
+          {
+            "name": "q",
+            "in": "query",
+            "required": false,
+            "schema": { "type": "string" },
+            "description": "text search"
+          },
+          { "name": "offset", "in": "query", "required": false, "schema": { "type": "integer" } },
+          { "name": "limit", "in": "query", "required": false, "schema": { "type": "integer" } }
+        ],
+        "responses": {
+          "200": { "$ref": "#/components/responses/JSONObject" },
+          "401": { "$ref": "#/components/responses/Unauthorized" }
+        }
+      }
+    },
+    "/api/usage/requests.csv": {
+      "get": {
+        "operationId": "downloadUsageRequests",
+        "summary": "Download the request ledger as CSV",
+        "tags": ["Usage"],
+        "parameters": [
+          {
+            "name": "period",
+            "in": "query",
+            "required": false,
+            "schema": { "type": "string", "enum": ["today", "7d", "30d", "all"] },
+            "description": "30d when absent or unknown"
+          },
+          { "name": "agent", "in": "query", "required": false, "schema": { "type": "string" } },
+          {
+            "name": "failed",
+            "in": "query",
+            "required": false,
+            "schema": { "type": "string", "enum": ["1"] },
+            "description": "only failed requests"
+          },
+          {
+            "name": "q",
+            "in": "query",
+            "required": false,
+            "schema": { "type": "string" },
+            "description": "text search"
+          }
+        ],
+        "responses": {
+          "200": { "description": "CSV attachment", "content": { "text/csv": { "schema": { "type": "string" } } } },
+          "401": { "$ref": "#/components/responses/Unauthorized" }
+        }
+      }
+    },
+    "/api/usage/requests/export": {
+      "post": {
+        "operationId": "exportUsageRequests",
+        "summary": "Save the request ledger as CSV in Downloads",
+        "description": "Writes to the Downloads folder of the machine Magpie runs on. Remote clients should use GET /api/usage/requests.csv.",
+        "tags": ["Usage"],
+        "parameters": [
+          {
+            "name": "period",
+            "in": "query",
+            "required": false,
+            "schema": { "type": "string", "enum": ["today", "7d", "30d", "all"] },
+            "description": "30d when absent or unknown"
+          },
+          { "name": "agent", "in": "query", "required": false, "schema": { "type": "string" } },
+          {
+            "name": "failed",
+            "in": "query",
+            "required": false,
+            "schema": { "type": "string", "enum": ["1"] },
+            "description": "only failed requests"
+          },
+          {
+            "name": "q",
+            "in": "query",
+            "required": false,
+            "schema": { "type": "string" },
+            "description": "text search"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Saved file",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": { "path": { "type": "string" }, "rows": { "type": "integer" } }
+                }
+              }
+            }
+          },
+          "400": { "$ref": "#/components/responses/BadRequest" },
+          "401": { "$ref": "#/components/responses/Unauthorized" }
+        }
+      }
+    },
+    "/api/usage/codex-reset": {
+      "post": {
+        "operationId": "useCodexReset",
+        "summary": "Spend one of a Codex account's rate-limit resets",
+        "tags": ["Usage"],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "type": "object", "properties": { "user": { "type": "string" } }, "required": ["user"] }
+            }
+          }
+        },
+        "responses": {
+          "200": { "$ref": "#/components/responses/JSONObject" },
+          "400": { "$ref": "#/components/responses/BadRequest" },
+          "401": { "$ref": "#/components/responses/Unauthorized" }
+        }
+      }
+    },
+    "/api/gateway/history": {
+      "get": {
+        "operationId": "getGatewayHistory",
+        "summary": "Get a past day's gateway routes",
+        "tags": ["State"],
+        "parameters": [
+          {
+            "name": "day",
+            "in": "query",
+            "required": false,
+            "schema": { "type": "string" },
+            "description": "YYYY-MM-DD"
+          }
+        ],
+        "responses": {
+          "200": { "$ref": "#/components/responses/JSONObject" },
+          "401": { "$ref": "#/components/responses/Unauthorized" }
+        }
+      }
+    },
+    "/api/gateway/unrest": {
+      "post": {
+        "operationId": "liftAccountRest",
+        "summary": "Lift an account's rest by hand",
+        "tags": ["State"],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "type": "object", "properties": { "key": { "type": "string" } }, "required": ["key"] }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Whether it was lifted",
+            "content": {
+              "application/json": { "schema": { "type": "object", "properties": { "lifted": { "type": "boolean" } } } }
+            }
+          },
+          "400": { "$ref": "#/components/responses/BadRequest" },
+          "401": { "$ref": "#/components/responses/Unauthorized" }
+        }
+      }
+    },
+    "/api/window/{action}": {
+      "post": {
+        "operationId": "windowAction",
+        "summary": "Perform a desktop window action",
+        "description": "`magpie web` has no windows, so `hide`, `main`, `fit`, `tint` and `titlebar` do nothing. `quit` stops `magpie web`, including its gateway.",
+        "tags": ["Host"],
+        "parameters": [
+          {
+            "name": "action",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "string", "enum": ["hide", "main", "quit", "fit", "tint"] }
+          },
+          { "name": "view", "in": "query", "schema": { "type": "string" } },
+          { "name": "h", "in": "query", "schema": { "type": "integer" } },
+          {
+            "name": "ease",
+            "in": "query",
+            "schema": { "type": "string", "description": "CSS cubic-bezier control points x1,y1,x2,y2" }
+          },
+          { "name": "c", "in": "query", "schema": { "type": "string", "description": "RGBA bytes r,g,b,a" } },
+          { "name": "ms", "in": "query", "schema": { "type": "integer" } }
+        ],
+        "responses": { "204": { "description": "Accepted" }, "401": { "$ref": "#/components/responses/Unauthorized" } }
+      }
+    },
+    "/api/providers": {
+      "get": {
+        "operationId": "getProviders",
+        "summary": "Get providers, presets, excluded sign-ins and gateway state",
+        "tags": ["Providers"],
+        "responses": {
+          "200": { "$ref": "#/components/responses/ProviderState" },
+          "401": { "$ref": "#/components/responses/Unauthorized" }
+        }
+      }
+    },
+    "/api/provider/{action}": {
+      "post": {
+        "operationId": "changeProvider",
+        "summary": "Create, edit, inspect, test or delete a provider",
+        "description": "The request shape depends on action. `save` accepts a Provider plus `new`, `from` and `clearBalanceToken`; the other actions principally require `id` and their relevant provider field.",
+        "tags": ["Providers"],
+        "parameters": [
+          {
+            "name": "action",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "enum": ["show", "save", "key", "route", "affinity", "delete", "test", "unfetch", "models"]
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ProviderActionRequest" } } }
+        },
+        "responses": {
+          "200": {
+            "description": "Provider state, a revealed key, test results, or a refreshed model count depending on action",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ProviderActionResponse" } } }
+          },
+          "400": { "$ref": "#/components/responses/BadRequest" },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "404": { "$ref": "#/components/responses/NotFound" }
+        }
+      }
+    },
+    "/api/icons/favicon": {
+      "post": {
+        "operationId": "storeProviderFavicon",
+        "summary": "Store a site's favicon as a provider icon",
+        "description": "Finds the icon of the site at `url`, usually a provider's base URL, and stores it.",
+        "tags": ["Providers"],
+        "requestBody": {
+          "required": true,
+          "content": { "application/json": { "schema": { "$ref": "#/components/schemas/URLRequest" } } }
+        },
+        "responses": {
+          "200": {
+            "description": "Stored icon reference",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/IconReference" } } }
+          },
+          "400": { "$ref": "#/components/responses/BadRequest" },
+          "401": { "$ref": "#/components/responses/Unauthorized" }
+        }
+      }
+    },
+    "/api/icons": {
+      "post": {
+        "operationId": "storeProviderIcon",
+        "summary": "Store a provider icon",
+        "description": "Accepts raw image bytes, or JSON whose `data` is base64. The maximum decoded icon size is enforced by Magpie.",
+        "tags": ["Providers"],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/octet-stream": { "schema": { "type": "string", "contentEncoding": "base64" } },
+            "application/json": { "schema": { "$ref": "#/components/schemas/Base64Data" } }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Stored icon reference",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/IconReference" } } }
+          },
+          "400": { "$ref": "#/components/responses/BadRequest" },
+          "401": { "$ref": "#/components/responses/Unauthorized" }
+        }
+      }
+    },
+    "/api/icons/{name}": {
+      "get": {
+        "operationId": "getProviderIcon",
+        "summary": "Get a stored provider icon",
+        "tags": ["Providers"],
+        "parameters": [{ "name": "name", "in": "path", "required": true, "schema": { "type": "string" } }],
+        "responses": {
+          "200": {
+            "description": "Icon bytes",
+            "content": {
+              "image/png": { "schema": { "type": "string", "contentEncoding": "base64" } },
+              "image/jpeg": { "schema": { "type": "string", "contentEncoding": "base64" } },
+              "image/svg+xml": { "schema": { "type": "string" } }
+            }
+          },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "404": { "$ref": "#/components/responses/NotFound" }
+        }
+      }
+    },
+    "/api/importapps": {
+      "get": {
+        "operationId": "getImportableApps",
+        "summary": "List providers importable from installed applications",
+        "tags": ["Providers"],
+        "responses": {
+          "200": { "$ref": "#/components/responses/JSONArray" },
+          "401": { "$ref": "#/components/responses/Unauthorized" }
+        }
+      },
+      "post": {
+        "operationId": "importFromApps",
+        "summary": "Import selected providers from installed applications",
+        "tags": ["Providers"],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["picks"],
+                "properties": {
+                  "picks": { "type": "array", "items": { "type": "object", "additionalProperties": true } }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": { "$ref": "#/components/responses/JSONObject" },
+          "400": { "$ref": "#/components/responses/BadRequest" },
+          "401": { "$ref": "#/components/responses/Unauthorized" }
+        }
+      }
+    },
+    "/api/import/{id}": {
+      "get": {
+        "operationId": "consumeStashedImport",
+        "summary": "Consume a one-time import previously stashed by the desktop application",
+        "description": "Links are stashed by the desktop app when the system opens a magpie:// link; `magpie web` stashes none.",
+        "tags": ["Providers"],
+        "parameters": [{ "name": "id", "in": "path", "required": true, "schema": { "type": "string" } }],
+        "responses": {
+          "200": { "$ref": "#/components/responses/JSONObject" },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "404": { "$ref": "#/components/responses/NotFound" }
+        }
+      }
+    },
+    "/api/import/icon": {
+      "post": {
+        "operationId": "fetchImportIcon",
+        "summary": "Fetch and store an icon referenced by an import",
+        "tags": ["Providers"],
+        "requestBody": {
+          "required": true,
+          "content": { "application/json": { "schema": { "$ref": "#/components/schemas/URLRequest" } } }
+        },
+        "responses": {
+          "200": {
+            "description": "Stored icon reference",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/IconReference" } } }
+          },
+          "400": { "$ref": "#/components/responses/BadRequest" },
+          "401": { "$ref": "#/components/responses/Unauthorized" }
+        }
+      }
+    },
+    "/api/login/usage": {
+      "get": {
+        "operationId": "getLoginUsage",
+        "summary": "Get subscription usage by account",
+        "tags": ["Accounts"],
+        "parameters": [{ "name": "agent", "in": "query", "schema": { "type": "string" } }],
+        "responses": {
+          "200": { "$ref": "#/components/responses/JSONObject" },
+          "401": { "$ref": "#/components/responses/Unauthorized" }
+        }
+      }
+    },
+    "/api/login/{action}": {
+      "post": {
+        "operationId": "changeLogin",
+        "summary": "Switch, forget, enable or disable a remembered account",
+        "tags": ["Accounts"],
+        "parameters": [
+          {
+            "name": "action",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "string", "enum": ["switch", "forget", "on", "off"] }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": { "application/json": { "schema": { "$ref": "#/components/schemas/LoginChange" } } }
+        },
+        "responses": {
+          "200": { "$ref": "#/components/responses/ProviderState" },
+          "400": { "$ref": "#/components/responses/BadRequest" },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "404": { "$ref": "#/components/responses/NotFound" }
+        }
+      }
+    },
+    "/api/keys/{action}": {
+      "post": {
+        "operationId": "changeProviderKey",
+        "summary": "Add, select, rename, configure, enable or remove a provider key",
+        "tags": ["Providers"],
+        "parameters": [
+          {
+            "name": "action",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "string", "enum": ["add", "protocol", "use", "remove", "rename", "on", "off"] }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": { "application/json": { "schema": { "$ref": "#/components/schemas/KeyChange" } } }
+        },
+        "responses": {
+          "200": { "$ref": "#/components/responses/ProviderState" },
+          "400": { "$ref": "#/components/responses/BadRequest" },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "404": { "$ref": "#/components/responses/NotFound" }
+        }
+      }
+    },
+    "/api/signin": {
+      "post": {
+        "operationId": "startSignIn",
+        "summary": "Start adding a subscription account",
+        "description": "The returned status contains the URL when available. `magpie web` does not open a browser; poll GET /api/signin/{id} while the state is `waiting` and let the calling application open the URL. A sign-in whose CLI is not installed fails at once: Cypheria builds never install agent CLIs. In Cypheria integration mode only the subscriptions of the agents in the agents file (Claude, Codex, Copilot, Cursor, Devin, Gemini, Antigravity, Grok) can be signed in to; any other is refused with 400.",
+        "tags": ["Accounts"],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "type": "object", "required": ["agent"], "properties": { "agent": { "type": "string" } } }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Sign-in status",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/SignInStatus" } } }
+          },
+          "400": { "$ref": "#/components/responses/BadRequest" },
+          "401": { "$ref": "#/components/responses/Unauthorized" }
+        }
+      }
+    },
+    "/api/signin/{id}": {
+      "get": {
+        "operationId": "getSignIn",
+        "summary": "Poll a sign-in attempt",
+        "tags": ["Accounts"],
+        "parameters": [{ "name": "id", "in": "path", "required": true, "schema": { "type": "string" } }],
+        "responses": {
+          "200": {
+            "description": "Sign-in status",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/SignInStatus" } } }
+          },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "404": { "$ref": "#/components/responses/NotFound" }
+        }
+      }
+    },
+    "/api/signin/{id}/cancel": {
+      "post": {
+        "operationId": "cancelSignIn",
+        "summary": "Cancel a sign-in attempt",
+        "tags": ["Accounts"],
+        "parameters": [{ "name": "id", "in": "path", "required": true, "schema": { "type": "string" } }],
+        "responses": { "204": { "description": "Canceled" }, "401": { "$ref": "#/components/responses/Unauthorized" } }
+      }
+    },
+    "/api/groups": {
+      "get": {
+        "operationId": "getGroups",
+        "summary": "Get routing groups, model choices and account/key pools",
+        "tags": ["Groups"],
+        "responses": {
+          "200": { "$ref": "#/components/responses/JSONObject" },
+          "401": { "$ref": "#/components/responses/Unauthorized" }
+        }
+      }
+    },
+    "/api/groups/{action}": {
+      "post": {
+        "operationId": "changeGroup",
+        "summary": "Save, delete or restore a routing group",
+        "tags": ["Groups"],
+        "parameters": [
+          {
+            "name": "action",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "string", "enum": ["save", "delete", "show"] }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": { "application/json": { "schema": { "$ref": "#/components/schemas/GroupChange" } } }
+        },
+        "responses": {
+          "200": { "$ref": "#/components/responses/JSONObject" },
+          "400": { "$ref": "#/components/responses/BadRequest" },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "404": { "$ref": "#/components/responses/NotFound" }
+        }
+      }
+    },
+    "/api/gateway/trace": {
+      "get": {
+        "operationId": "getGatewayTrace",
+        "summary": "Get routing trace events",
+        "description": "When `wait` is non-empty the request waits for a change for up to 25 seconds.",
+        "tags": ["State"],
+        "parameters": [
+          { "name": "after", "in": "query", "schema": { "type": "integer", "format": "int64", "default": 0 } },
+          { "name": "wait", "in": "query", "schema": { "type": "string" } }
+        ],
+        "responses": {
+          "200": { "$ref": "#/components/responses/JSONObject" },
+          "401": { "$ref": "#/components/responses/Unauthorized" }
+        }
+      }
+    },
+    "/api/usage": {
+      "get": {
+        "operationId": "getUsage",
+        "summary": "Get locally recorded token and cost usage",
+        "tags": ["Usage"],
+        "parameters": [
+          {
+            "name": "period",
+            "in": "query",
+            "schema": { "type": "string", "enum": ["today", "7d", "30d", "all"], "default": "30d" }
+          }
+        ],
+        "responses": {
+          "200": { "$ref": "#/components/responses/JSONObject" },
+          "401": { "$ref": "#/components/responses/Unauthorized" }
+        }
+      }
+    },
+    "/api/usage/quotas": {
+      "get": {
+        "operationId": "getQuotas",
+        "summary": "Get subscription, plan and key allowance data",
+        "tags": ["Usage"],
+        "responses": {
+          "200": { "$ref": "#/components/responses/JSONArray" },
+          "401": { "$ref": "#/components/responses/Unauthorized" }
+        }
+      }
+    },
+    "/api/backup/export": {
+      "post": {
+        "operationId": "exportBackup",
+        "summary": "Write an encrypted backup to the server's Downloads directory",
+        "description": "The response contains the resulting path. No file manager is opened by `magpie web`.",
+        "tags": ["Backup"],
+        "requestBody": {
+          "required": true,
+          "content": { "application/json": { "schema": { "$ref": "#/components/schemas/BackupExport" } } }
+        },
+        "responses": {
+          "200": { "$ref": "#/components/responses/JSONObject" },
+          "400": { "$ref": "#/components/responses/BadRequest" },
+          "401": { "$ref": "#/components/responses/Unauthorized" }
+        }
+      }
+    },
+    "/api/backup/import": {
+      "post": {
+        "operationId": "importBackup",
+        "summary": "Restore an encrypted backup",
+        "tags": ["Backup"],
+        "requestBody": {
+          "required": true,
+          "content": { "application/json": { "schema": { "$ref": "#/components/schemas/BackupImport" } } }
+        },
+        "responses": {
+          "200": { "$ref": "#/components/responses/JSONObject" },
+          "400": { "$ref": "#/components/responses/BadRequest" },
+          "401": { "$ref": "#/components/responses/Unauthorized" }
+        }
+      }
+    },
+    "/api/davsync": {
+      "get": {
+        "operationId": "getDAVSync",
+        "summary": "Get WebDAV synchronization status",
+        "tags": ["Backup"],
+        "responses": {
+          "200": { "$ref": "#/components/responses/JSONObject" },
+          "401": { "$ref": "#/components/responses/Unauthorized" }
+        }
+      }
+    },
+    "/api/davsync/{action}": {
+      "post": {
+        "operationId": "changeDAVSync",
+        "summary": "Configure or run WebDAV synchronization",
+        "description": "`reveal` is unsupported by `magpie web`; clients should present the server-side path themselves.",
+        "tags": ["Backup"],
+        "parameters": [
+          {
+            "name": "action",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "string", "enum": ["save", "now", "off", "dismiss", "reveal"] }
+          }
+        ],
+        "requestBody": {
+          "content": { "application/json": { "schema": { "type": "object", "additionalProperties": true } } }
+        },
+        "responses": {
+          "200": { "$ref": "#/components/responses/JSONObject" },
+          "400": { "$ref": "#/components/responses/BadRequest" },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "404": { "$ref": "#/components/responses/NotFound" }
+        }
+      }
+    },
+    "/api/library": {
+      "get": {
+        "operationId": "getLibrary",
+        "summary": "Get shared instructions, MCP servers, skills and agent destinations",
+        "tags": ["Library"],
+        "responses": {
+          "200": { "$ref": "#/components/responses/JSONObject" },
+          "400": { "$ref": "#/components/responses/BadRequest" },
+          "401": { "$ref": "#/components/responses/Unauthorized" }
+        }
+      }
+    },
+    "/api/library/skill": {
+      "get": {
+        "operationId": "getLibrarySkill",
+        "summary": "Read an installed skill",
+        "tags": ["Library"],
+        "parameters": [{ "name": "name", "in": "query", "required": true, "schema": { "type": "string" } }],
+        "responses": {
+          "200": { "$ref": "#/components/responses/JSONObject" },
+          "400": { "$ref": "#/components/responses/BadRequest" },
+          "401": { "$ref": "#/components/responses/Unauthorized" }
+        }
+      }
+    },
+    "/api/library/market/servers": {
+      "get": {
+        "operationId": "searchMarketServers",
+        "summary": "Search the MCP server market",
+        "tags": ["Library"],
+        "parameters": [{ "name": "q", "in": "query", "schema": { "type": "string" } }],
+        "responses": {
+          "200": { "$ref": "#/components/responses/JSONObject" },
+          "401": { "$ref": "#/components/responses/Unauthorized" }
+        }
+      }
+    },
+    "/api/library/market/skills": {
+      "get": {
+        "operationId": "searchMarketSkills",
+        "summary": "Search the skills market",
+        "tags": ["Library"],
+        "parameters": [{ "name": "q", "in": "query", "schema": { "type": "string" } }],
+        "responses": {
+          "200": { "$ref": "#/components/responses/JSONObject" },
+          "401": { "$ref": "#/components/responses/Unauthorized" }
+        }
+      }
+    },
+    "/api/library/market/about": {
+      "post": {
+        "operationId": "getMarketSkillDescriptions",
+        "summary": "Get descriptions for up to 60 market skill IDs",
+        "tags": ["Library"],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["ids"],
+                "properties": { "ids": { "type": "array", "maxItems": 60, "items": { "type": "string" } } }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": { "$ref": "#/components/responses/JSONObject" },
+          "400": { "$ref": "#/components/responses/BadRequest" },
+          "401": { "$ref": "#/components/responses/Unauthorized" }
+        }
+      }
+    },
+    "/api/library/icon": {
+      "get": {
+        "operationId": "getLibraryIcon",
+        "summary": "Fetch a cached market icon",
+        "tags": ["Library"],
+        "parameters": [
+          { "name": "u", "in": "query", "required": true, "schema": { "type": "string", "format": "uri" } }
+        ],
+        "responses": {
+          "200": {
+            "description": "Icon bytes",
+            "content": { "image/*": { "schema": { "type": "string", "contentEncoding": "base64" } } }
+          },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "404": { "$ref": "#/components/responses/NotFound" }
+        }
+      }
+    },
+    "/api/library/skills/probe": {
+      "post": {
+        "operationId": "probeSkills",
+        "summary": "Inspect skills available at a source",
+        "tags": ["Library"],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "type": "object", "required": ["source"], "properties": { "source": { "type": "string" } } }
+            }
+          }
+        },
+        "responses": {
+          "200": { "$ref": "#/components/responses/JSONObject" },
+          "400": { "$ref": "#/components/responses/BadRequest" },
+          "401": { "$ref": "#/components/responses/Unauthorized" }
+        }
+      }
+    },
+    "/api/library/rtk": {
+      "get": {
+        "operationId": "getRTK",
+        "summary": "Get RTK status by agent",
+        "tags": ["Library"],
+        "responses": {
+          "200": { "$ref": "#/components/responses/JSONObject" },
+          "401": { "$ref": "#/components/responses/Unauthorized" }
+        }
+      },
+      "post": {
+        "operationId": "setRTK",
+        "summary": "Enable or disable RTK for an agent",
+        "description": "rtk is off in Cypheria integration mode: refused with 400.",
+        "tags": ["Library"],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["agent", "on"],
+                "properties": { "agent": { "type": "string" }, "on": { "type": "boolean" } }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": { "$ref": "#/components/responses/JSONObject" },
+          "400": { "$ref": "#/components/responses/BadRequest" },
+          "401": { "$ref": "#/components/responses/Unauthorized" }
+        }
+      }
+    },
+    "/api/library/rtk/install": {
+      "post": {
+        "operationId": "installRTK",
+        "summary": "Install RTK",
+        "description": "Installs RTK on the machine Magpie runs on and returns its status by agent. Refused with 400 in Cypheria integration mode.",
+        "tags": ["Library"],
+        "responses": {
+          "200": { "$ref": "#/components/responses/JSONObject" },
+          "400": { "$ref": "#/components/responses/BadRequest" },
+          "401": { "$ref": "#/components/responses/Unauthorized" }
+        }
+      }
+    },
+    "/api/sessions": {
+      "get": {
+        "operationId": "listSessions",
+        "summary": "List recent agent sessions",
+        "description": "Session paths under the home directory are abbreviated with `~`. `terminal` is always false in `magpie web`.",
+        "tags": ["Sessions"],
+        "parameters": [
+          { "name": "limit", "in": "query", "required": false, "schema": { "type": "integer", "minimum": 0 } }
+        ],
+        "responses": {
+          "200": { "$ref": "#/components/responses/JSONObject" },
+          "401": { "$ref": "#/components/responses/Unauthorized" }
+        }
+      }
+    },
+    "/api/sessions/terminal": {
+      "post": {
+        "operationId": "openSessionTerminal",
+        "summary": "Resume a session in Terminal",
+        "description": "Unsupported by `magpie web`. The session's `resume` command from GET /api/sessions remains available to the calling application.",
+        "tags": ["Host", "Sessions"],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["agent", "id"],
+                "properties": { "agent": { "type": "string" }, "id": { "type": "string" } }
+              }
+            }
+          }
+        },
+        "responses": {
+          "400": { "$ref": "#/components/responses/HostUnavailable" },
+          "401": { "$ref": "#/components/responses/Unauthorized" }
+        }
+      }
+    },
+    "/api/library/reveal": {
+      "post": {
+        "operationId": "revealLibraryPath",
+        "summary": "Reveal an allow-listed library path",
+        "description": "Unsupported by `magpie web`. The requested path remains available to the calling application.",
+        "tags": ["Host", "Library"],
+        "requestBody": {
+          "required": true,
+          "content": { "application/json": { "schema": { "$ref": "#/components/schemas/PathRequest" } } }
+        },
+        "responses": {
+          "400": { "$ref": "#/components/responses/HostUnavailable" },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "403": { "description": "Path is not in the library view" }
+        }
+      }
+    },
+    "/api/library/{what}/{action}": {
+      "post": {
+        "operationId": "changeLibrary",
+        "summary": "Change instructions, MCP servers, skills, market items or synchronize all",
+        "description": "Valid pairs are instructions/save, instructions/import, servers/save, servers/agents, servers/remove, servers/import, skills/install, skills/update, skills/agents, skills/remove, skills/import, market/server, market/skill and all/sync.",
+        "tags": ["Library"],
+        "parameters": [
+          {
+            "name": "what",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "string", "enum": ["instructions", "servers", "skills", "market", "all"] }
+          },
+          {
+            "name": "action",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "enum": ["save", "import", "agents", "remove", "install", "update", "server", "skill", "sync"]
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": { "application/json": { "schema": { "$ref": "#/components/schemas/LibraryChange" } } }
+        },
+        "responses": {
+          "200": { "$ref": "#/components/responses/JSONObject" },
+          "400": { "$ref": "#/components/responses/BadRequest" },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "404": { "$ref": "#/components/responses/NotFound" }
+        }
+      }
+    },
+    "/api/update": {
+      "get": {
+        "operationId": "getUpdate",
+        "summary": "Get desktop updater state",
+        "description": "Self-updating is disabled in Cypheria builds: `state` is always `off`.",
+        "tags": ["Update"],
+        "responses": {
+          "200": { "$ref": "#/components/responses/JSONObject" },
+          "401": { "$ref": "#/components/responses/Unauthorized" }
+        }
+      }
+    },
+    "/api/update/check": {
+      "post": {
+        "operationId": "checkUpdate",
+        "summary": "Ask the desktop updater to check",
+        "description": "Self-updating is disabled in Cypheria builds: nothing is checked and `state` stays `off`.",
+        "tags": ["Update"],
+        "responses": {
+          "200": { "$ref": "#/components/responses/JSONObject" },
+          "401": { "$ref": "#/components/responses/Unauthorized" }
+        }
+      }
+    },
+    "/api/update/install": {
+      "post": {
+        "operationId": "installUpdate",
+        "summary": "Ask the desktop updater to install",
+        "description": "Self-updating is disabled in Cypheria builds: nothing is installed and the current state is returned.",
+        "tags": ["Update", "Host"],
+        "responses": {
+          "200": { "$ref": "#/components/responses/JSONObject" },
+          "204": { "description": "Not returned by Cypheria builds" },
+          "401": { "$ref": "#/components/responses/Unauthorized" }
+        }
+      }
+    },
+    "/api/copy": {
+      "post": {
+        "operationId": "copyText",
+        "summary": "Copy text through the desktop host",
+        "description": "Unsupported by `magpie web`. The calling application already has the text and should copy it locally.",
+        "tags": ["Host"],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "type": "object", "required": ["text"], "properties": { "text": { "type": "string" } } }
+            }
+          }
+        },
+        "responses": {
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "501": { "description": "Clipboard integration is unavailable" }
+        }
+      }
+    },
+    "/api/open": {
+      "post": {
+        "operationId": "openURL",
+        "summary": "Open a URL through the desktop host",
+        "description": "`magpie web` does nothing. The calling application should open the URL locally.",
+        "tags": ["Host"],
+        "requestBody": {
+          "required": true,
+          "content": { "application/json": { "schema": { "$ref": "#/components/schemas/URLRequest" } } }
+        },
+        "responses": {
+          "204": { "description": "Accepted; no browser is opened" },
+          "401": { "$ref": "#/components/responses/Unauthorized" }
+        }
+      }
+    },
+    "/api/plugins/updates": {
+      "get": {
+        "operationId": "getPluginUpdates",
+        "summary": "Get plugin updates waiting and made",
+        "description": "Plugins are off in Cypheria integration mode: nothing is waiting or updated.",
+        "tags": ["Plugins"],
+        "responses": {
+          "200": { "$ref": "#/components/responses/JSONObject" },
+          "401": { "$ref": "#/components/responses/Unauthorized" }
+        }
+      }
+    },
+    "/api/gateway/route": {
+      "get": {
+        "operationId": "getGatewayRoute",
+        "summary": "Get one gateway route",
+        "description": "Looks in today's trace, then in the history of the day given.",
+        "tags": ["State"],
+        "parameters": [
+          { "name": "id", "in": "query", "required": true, "schema": { "type": "integer" } },
+          {
+            "name": "day",
+            "in": "query",
+            "required": false,
+            "schema": { "type": "string" },
+            "description": "YYYY-MM-DD, for a route no longer in today's trace"
+          }
+        ],
+        "responses": {
+          "200": { "$ref": "#/components/responses/JSONObject" },
+          "400": { "$ref": "#/components/responses/BadRequest" },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "404": { "$ref": "#/components/responses/NotFound" }
+        }
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": {
+      "bearerAuth": {
+        "type": "http",
+        "scheme": "bearer",
+        "description": "The `magpie web` key: the exact MAGPIE_WEB_KEY value, or the key in the link a run prints when none is set."
+      }
+    },
+    "responses": {
+      "State": {
+        "description": "Current detected-agent state",
+        "content": { "application/json": { "schema": { "$ref": "#/components/schemas/State" } } }
+      },
+      "SettingsState": {
+        "description": "Settings and runtime facts",
+        "content": { "application/json": { "schema": { "$ref": "#/components/schemas/SettingsState" } } }
+      },
+      "ProviderState": {
+        "description": "Providers and gateway state",
+        "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ProviderState" } } }
+      },
+      "JSONObject": {
+        "description": "JSON object",
+        "content": { "application/json": { "schema": { "type": "object", "additionalProperties": true } } }
+      },
+      "JSONArray": {
+        "description": "JSON array",
+        "content": { "application/json": { "schema": { "type": "array", "items": {} } } }
+      },
+      "BadRequest": {
+        "description": "Invalid request or operation failure",
+        "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } }
+      },
+      "Unauthorized": {
+        "description": "Missing or invalid bearer token",
+        "headers": { "WWW-Authenticate": { "schema": { "type": "string", "const": "Bearer" } } },
+        "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } }
+      },
+      "NotFound": { "description": "Unknown resource or action" },
+      "HostUnavailable": {
+        "description": "Desktop integration is unavailable in `magpie web`",
+        "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } }
+      }
+    },
+    "schemas": {
+      "Error": { "type": "object", "required": ["error"], "properties": { "error": { "type": "string" } } },
+      "Settings": {
+        "type": "object",
+        "properties": {
+          "theme": { "type": "string", "enum": ["", "system", "light", "dark"] },
+          "lang": { "type": "string", "enum": ["", "system", "en", "zh"] },
+          "tray": { "type": "string", "enum": ["", "panel", "window"] },
+          "dock": { "type": "boolean" },
+          "proxy": { "type": "string" },
+          "redact": { "type": "boolean" },
+          "redactPersonal": { "type": "boolean" },
+          "redactWords": { "type": "array", "items": { "type": "string" } },
+          "agentOrder": { "type": "array", "items": { "type": "string" } },
+          "agentsHidden": { "type": "array", "items": { "type": "string" } },
+          "agentsShown": { "type": "array", "items": { "type": "string" } },
+          "visible": { "type": "object", "additionalProperties": { "type": "array", "items": { "type": "string" } } },
+          "window": { "type": "array", "minItems": 2, "maxItems": 2, "items": { "type": "integer" } },
+          "sessionTerminal": {
+            "type": "string",
+            "description": "SessionTerminal is the Mac app that opens a resumed session, by bundle id."
+          },
+          "currency": {
+            "type": "string",
+            "description": "Currency is what a cost — the Usage page's, the tray panel's, the TUI's and the CLI's — is shown converted to."
+          },
+          "dockWindow": {
+            "type": "boolean",
+            "description": "DockWindow shows it in the Dock only while its window is open, so Cmd-Tab reaches the window without an icon kept there the rest of the time."
+          },
+          "redactRules": { "type": "array", "items": { "type": "object" } },
+          "lan": {
+            "type": "boolean",
+            "description": "LAN shares the gateway on the local network, for agents on other machines."
+          },
+          "lanKey": { "type": "string" },
+          "codexWarmup": {
+            "type": "string",
+            "description": "CodexWarmup starts a ChatGPT account's next window as soon as the last one resets, with one tiny request, so it counts from then (a Codex window starts at its first use)"
+          },
+          "claudeWarmup": {
+            "type": "string",
+            "description": "ClaudeWarmup is CodexWarmup for the Claude accounts, the request sent through Claude Code."
+          },
+          "codexWarmAt": {
+            "type": "string",
+            "description": "CodexWarmAt starts each ChatGPT account's 5-hour window at a time of day of the user's choosing, local \"15:04\", with the same tiny request."
+          },
+          "claudeWarmAt": { "type": "string" },
+          "codexAutoReset": {
+            "type": "array",
+            "items": { "type": "string" },
+            "description": "CodexAutoReset are the ChatGPT accounts (lower-case) that spend one of their rate-limit resets by themselves once their weekly window is used up and no other account can take the request."
+          },
+          "workbuddyCheckin": {
+            "type": "boolean",
+            "description": "WorkBuddyCheckin presses WorkBuddy's daily check-in (签到) for each signed-in WorkBuddy (China) account once a Beijing day, claiming the credits it gives while its event runs."
+          },
+          "noStats": {
+            "type": "boolean",
+            "description": "Stops the daily event that counts magpie's users. Usage statistics are always off in this build."
+          },
+          "noUpdatePill": {
+            "type": "boolean",
+            "description": "NoUpdatePill keeps the header's Update pill away when a newer magpie is out."
+          },
+          "updateSkip": { "type": "string" },
+          "vision": {
+            "type": "string",
+            "description": "Vision is the model that describes an image to a model that can't see it."
+          },
+          "imageGen": {
+            "type": "string",
+            "description": "ImageGen is the model magpie's generate_image tool draws with (the gateway's /v1/images/generations when a request names no model)"
+          },
+          "trayUsages": {
+            "type": "array",
+            "items": { "type": "string" },
+            "description": "TrayUsages are the subscriptions and plans whose windows are shown beside the tray icon, in the order shown, each by its provider and account (\"claude|a@b.c\")"
+          },
+          "trayUsage": {
+            "type": "string",
+            "description": "TrayUsage is TrayUsages' first, all a magpie before them read."
+          },
+          "trayUsageEvery": {
+            "type": "integer",
+            "description": "TrayUsageEvery is how often, in minutes, that text is brought up to date."
+          },
+          "trayNoLogos": {
+            "type": "boolean",
+            "description": "TrayNoLogos draws the Mac menu bar's cards without their logos."
+          },
+          "quotaLeft": {
+            "type": "boolean",
+            "description": "QuotaLeft shows a subscription's windows by how much of each is left, not used."
+          },
+          "usageAlert": {
+            "type": "integer",
+            "description": "UsageAlert is how much of a subscription's or plan's window, in percent, is used when magpie says so with a notification."
+          },
+          "balanceAlert": {
+            "type": "number",
+            "description": "BalanceAlert is the balance a key or account has fallen to when magpie says so, in that balance's own currency or credits, once until it is topped up past it again."
+          },
+          "plainNames": { "type": "boolean" },
+          "textSize": {
+            "type": "integer",
+            "description": "TextSize is how large the window's and the tray panel's pages are drawn, in percent (one of TextSizes)"
+          },
+          "hiddenModels": {
+            "type": "object",
+            "additionalProperties": { "items": { "type": "string" }, "type": "array" },
+            "description": "HiddenModels are the catalog entries (their ids, \"<provider>/<model>\" or a group's) taken out of an agent's lists one by one, by agent id, after Visible."
+          },
+          "modelNames": {
+            "type": "object",
+            "additionalProperties": { "type": "string" },
+            "description": "The names the user gave models, by \"<provider id>/<model id>\"."
+          },
+          "modelEfforts": {
+            "type": "object",
+            "additionalProperties": { "items": { "type": "string" }, "type": "array" },
+            "description": "ModelEfforts are the reasoning levels the user keeps of a model's, by \"<provider id>/<model id>\"."
+          },
+          "modelImages": {
+            "type": "object",
+            "additionalProperties": { "type": "boolean" },
+            "description": "ModelImages is whether the user said a model takes images, by \"<provider id>/<model id>\"."
+          },
+          "modelPrices": {
+            "type": "object",
+            "additionalProperties": { "type": "object" },
+            "description": "ModelPrices is what a model costs the user, in USD per million tokens, by \"<provider id>/<model id>\", and \"*\" for every model of that provider."
+          },
+          "modelOutputs": {
+            "type": "object",
+            "additionalProperties": { "type": "integer" },
+            "description": "ModelOutputs is the most a reply of a model may hold, by \"<provider id>/<model id>\", and \"*\" for every model of that provider."
+          },
+          "modelWires": {
+            "type": "object",
+            "additionalProperties": { "type": "string" },
+            "description": "ModelWires is the name to send a vendor for a model magpie knows by another, by \"<provider id>/<model id>\", and \"*\" for every model of that provider."
+          }
+        }
+      },
+      "SettingsState": {
+        "allOf": [
+          { "$ref": "#/components/schemas/Settings" },
+          {
+            "type": "object",
+            "required": [
+              "version",
+              "dir",
+              "gateway",
+              "proxyNow",
+              "proxySource",
+              "login",
+              "visionModels",
+              "imageGenModels",
+              "workbuddy",
+              "fx"
+            ],
+            "properties": {
+              "version": { "type": "string" },
+              "dir": { "type": "string" },
+              "gateway": { "type": "string", "format": "uri" },
+              "proxyNow": { "type": "string" },
+              "proxySource": { "type": "string" },
+              "terminalApps": {
+                "type": "array",
+                "items": { "type": "object" },
+                "description": "Mac apps that explicitly handle .command files, for resumed sessions."
+              },
+              "terminalDefault": { "type": "string" },
+              "login": { "type": "boolean", "description": "Whether magpie opens at login." },
+              "visionAuto": {
+                "type": "string",
+                "description": "The model that describes images when Vision names none, and those that can be named."
+              },
+              "visionModels": { "type": "array", "items": { "type": "object" } },
+              "imageGenAuto": {
+                "type": "string",
+                "description": "The model magpie's generate_image tool draws with when ImageGen names none, and those that can be named."
+              },
+              "imageGenModels": { "type": "array", "items": { "type": "object" } },
+              "lanURLs": {
+                "type": "array",
+                "items": { "type": "string" },
+                "description": "Where other machines reach the gateway while it is shared."
+              },
+              "lanContainer": {
+                "type": "boolean",
+                "description": "LANURLs are a container's own addresses, not the host's."
+              },
+              "codexWarmed": {
+                "type": "string",
+                "format": "date-time",
+                "description": "When the Codex warm-up last started an account's window."
+              },
+              "claudeWarmed": { "type": "string", "format": "date-time", "description": "And the Claude warm-up." },
+              "workbuddy": {
+                "type": "boolean",
+                "description": "Whether a WorkBuddy (China) account is signed in, and each one's last daily check-in."
+              },
+              "workbuddyCheckins": { "type": "array", "items": { "type": "object" } },
+              "fx": {
+                "type": "object",
+                "description": "The dollar-to-yuan rate costs are shown at when the currency is cny."
+              },
+              "notifyProblem": {
+                "type": "string",
+                "description": "NotifyProblem is why a usage alert set wouldn't be seen."
+              }
+            }
+          }
+        ]
+      },
+      "AgentOption": {
+        "type": "object",
+        "required": ["value", "note"],
+        "properties": {
+          "value": { "type": "string" },
+          "label": { "type": "string" },
+          "note": { "type": "string" },
+          "icon": { "type": "string" },
+          "icons": { "type": "array", "items": { "type": "string" } },
+          "group": { "type": "string" },
+          "groupIcon": { "type": "string" },
+          "ref": { "type": "string" },
+          "free": { "type": "boolean", "description": "Costs its subscription nothing." },
+          "context": { "type": "integer", "description": "The model's context window, when known." }
+        }
+      },
+      "AgentField": {
+        "type": "object",
+        "required": ["key", "label", "value", "options"],
+        "properties": {
+          "key": { "type": "string" },
+          "label": { "type": "string" },
+          "value": { "type": "string" },
+          "options": { "type": "array", "items": { "$ref": "#/components/schemas/AgentOption" } }
+        }
+      },
+      "AgentDrift": {
+        "type": "object",
+        "required": ["kind", "field", "want", "detail"],
+        "properties": {
+          "kind": { "type": "string", "enum": ["unwired", "replaced", "bypassed"] },
+          "field": { "type": "string" },
+          "now": { "type": "string" },
+          "want": { "type": "string" },
+          "detail": { "type": "string" }
+        }
+      },
+      "Agent": {
+        "type": "object",
+        "required": ["id", "name", "icon", "path", "fields"],
+        "properties": {
+          "id": { "type": "string" },
+          "name": { "type": "string" },
+          "icon": { "type": "string" },
+          "path": { "type": "string" },
+          "fields": { "type": "array", "items": { "$ref": "#/components/schemas/AgentField" } },
+          "drift": { "$ref": "#/components/schemas/AgentDrift" },
+          "import": { "type": "string", "description": "Import." },
+          "added": { "type": "boolean" },
+          "launch": { "type": "string", "description": "Launch." },
+          "models": { "type": "object", "description": "Models." }
+        }
+      },
+      "Client": {
+        "type": "object",
+        "required": ["id", "name", "icon"],
+        "properties": { "id": { "type": "string" }, "name": { "type": "string" }, "icon": { "type": "string" } }
+      },
+      "ProfileLibrary": {
+        "type": "object",
+        "required": ["servers", "skills", "instructions"],
+        "properties": {
+          "servers": { "type": "integer" },
+          "skills": { "type": "integer" },
+          "instructions": { "type": "boolean" }
+        }
+      },
+      "Profile": {
+        "type": "object",
+        "required": ["name", "summary"],
+        "properties": {
+          "name": { "type": "string" },
+          "summary": { "type": "string" },
+          "library": { "$ref": "#/components/schemas/ProfileLibrary" }
+        }
+      },
+      "State": {
+        "type": "object",
+        "required": ["agents", "clients", "profiles", "catalog", "settings", "fx"],
+        "properties": {
+          "agents": { "type": "array", "items": { "$ref": "#/components/schemas/Agent" } },
+          "clients": { "type": "array", "items": { "$ref": "#/components/schemas/Client" } },
+          "profiles": { "type": "array", "items": { "$ref": "#/components/schemas/Profile" } },
+          "catalog": { "type": "string" },
+          "notice": { "type": "string" },
+          "settings": { "$ref": "#/components/schemas/Settings" },
+          "fx": {
+            "type": "object",
+            "description": "The dollar-to-yuan rate costs are shown at when the currency is cny."
+          },
+          "unlisted": {
+            "type": "array",
+            "items": { "type": "object" },
+            "description": "Unlisted are the models kept for routing groups, which the pickers don't offer."
+          }
+        }
+      },
+      "AgentFieldChange": {
+        "type": "object",
+        "required": ["agent", "field", "value"],
+        "properties": { "agent": { "type": "string" }, "field": { "type": "string" }, "value": { "type": "string" } }
+      },
+      "AgentArrangement": {
+        "type": "object",
+        "properties": {
+          "order": { "type": "array", "items": { "type": "string" } },
+          "hidden": { "type": "array", "items": { "type": "string" } },
+          "shown": { "type": "array", "items": { "type": "string" } }
+        }
+      },
+      "NameRequest": { "type": "object", "required": ["name"], "properties": { "name": { "type": "string" } } },
+      "URLRequest": {
+        "type": "object",
+        "required": ["url"],
+        "properties": { "url": { "type": "string", "format": "uri" } }
+      },
+      "PathRequest": { "type": "object", "required": ["path"], "properties": { "path": { "type": "string" } } },
+      "Base64Data": {
+        "type": "object",
+        "required": ["data"],
+        "properties": { "data": { "type": "string", "contentEncoding": "base64" } }
+      },
+      "IconReference": { "type": "object", "required": ["icon"], "properties": { "icon": { "type": "string" } } },
+      "ProviderChange": {
+        "type": "object",
+        "additionalProperties": true,
+        "properties": {
+          "id": { "type": "string" },
+          "name": { "type": "string" },
+          "preset": { "type": "string" },
+          "key": { "type": "string", "writeOnly": true },
+          "models": { "type": "array", "items": { "type": "string" } },
+          "fallback": { "type": "array", "items": { "type": "string" } },
+          "routing": { "type": "string" },
+          "affinity": { "type": "string" },
+          "new": { "type": "boolean" },
+          "from": { "type": "string" },
+          "clearBalanceToken": { "type": "boolean" }
+        }
+      },
+      "ProviderReference": {
+        "type": "object",
+        "required": ["id"],
+        "additionalProperties": false,
+        "properties": { "id": { "type": "string" } }
+      },
+      "ProviderRouteChange": {
+        "type": "object",
+        "required": ["id", "routing"],
+        "additionalProperties": false,
+        "properties": { "id": { "type": "string" }, "routing": { "type": "string" } }
+      },
+      "ProviderAffinityChange": {
+        "type": "object",
+        "required": ["id", "affinity"],
+        "additionalProperties": false,
+        "properties": { "id": { "type": "string" }, "affinity": { "type": "string" } }
+      },
+      "ProviderSave": {
+        "allOf": [{ "$ref": "#/components/schemas/ProviderChange" }, { "type": "object", "required": ["new"] }]
+      },
+      "ProviderActionRequest": {
+        "oneOf": [
+          { "$ref": "#/components/schemas/ProviderReference" },
+          { "$ref": "#/components/schemas/ProviderRouteChange" },
+          { "$ref": "#/components/schemas/ProviderAffinityChange" },
+          { "$ref": "#/components/schemas/ProviderSave" }
+        ]
+      },
+      "ProviderModel": {
+        "type": "object",
+        "required": ["id", "name", "on", "images"],
+        "properties": {
+          "id": { "type": "string" },
+          "name": { "type": "string" },
+          "efforts": { "type": "array", "items": { "type": "string" } },
+          "on": { "type": "boolean" },
+          "default": { "type": "string", "description": "Its own name, when the user gave it another." },
+          "kept": {
+            "type": "array",
+            "items": { "type": "string" },
+            "description": "The reasoning levels the user keeps of Efforts, when not all."
+          },
+          "given": { "type": "boolean", "description": "Its levels aren't known." },
+          "images": { "type": "boolean", "description": "Agents are told it can see images." },
+          "imageSet": { "type": "boolean", "description": "The user said so, rather than its vendor." },
+          "context": { "type": "integer" },
+          "max": { "type": "integer", "description": "The most its context may be set to, above Context." },
+          "free": { "type": "boolean", "description": "Costs the subscription nothing." }
+        }
+      },
+      "KeyInfo": {
+        "type": "object",
+        "required": ["id", "masked", "active", "on"],
+        "properties": {
+          "id": { "type": "string" },
+          "name": { "type": "string" },
+          "masked": { "type": "string" },
+          "active": { "type": "boolean" },
+          "on": { "type": "boolean" },
+          "protocol": { "type": "string", "enum": ["", "chat", "responses", "anthropic"] }
+        }
+      },
+      "Login": {
+        "type": "object",
+        "required": ["agent", "user", "seen", "active", "on"],
+        "properties": {
+          "agent": { "type": "string" },
+          "user": { "type": "string" },
+          "plan": { "type": "string" },
+          "seen": { "type": "string", "format": "date-time" },
+          "active": { "type": "boolean" },
+          "on": { "type": "boolean" },
+          "lapsed": { "type": "string" },
+          "own": { "type": "boolean", "description": "Own is the agent's own sign-in, which magpie only reads." },
+          "paused": {
+            "type": "boolean",
+            "description": "Paused is the account the agent is signed in to, passed over by the gateway while another is on."
+          }
+        }
+      },
+      "Account": {
+        "type": "object",
+        "required": ["agent", "user"],
+        "properties": { "agent": { "type": "string" }, "user": { "type": "string" }, "plan": { "type": "string" } }
+      },
+      "AccountView": {
+        "allOf": [
+          { "$ref": "#/components/schemas/Account" },
+          {
+            "type": "object",
+            "required": ["agentName", "agentIcon"],
+            "properties": {
+              "agentName": { "type": "string" },
+              "agentIcon": { "type": "string" },
+              "logins": { "type": "array", "items": { "$ref": "#/components/schemas/Login" } }
+            }
+          }
+        ]
+      },
+      "ProviderAgent": {
+        "type": "object",
+        "required": ["id", "name", "icon", "current"],
+        "properties": {
+          "id": { "type": "string" },
+          "name": { "type": "string" },
+          "icon": { "type": "string" },
+          "current": { "type": "boolean" },
+          "model": { "type": "string" },
+          "group": { "type": "string" }
+        }
+      },
+      "ProviderView": {
+        "type": "object",
+        "required": [
+          "id",
+          "name",
+          "icon",
+          "preset",
+          "host",
+          "chat",
+          "responses",
+          "anthropic",
+          "catalog",
+          "website",
+          "keysUrl",
+          "balanceToken",
+          "key",
+          "ready",
+          "chosen",
+          "fallback",
+          "routing",
+          "affinity",
+          "models",
+          "exposed",
+          "unlisted",
+          "agents",
+          "sponsored",
+          "keyList",
+          "searches",
+          "proxy",
+          "off"
+        ],
+        "properties": {
+          "id": { "type": "string" },
+          "name": { "type": "string" },
+          "icon": { "type": "string" },
+          "preset": { "type": "string" },
+          "host": { "type": "string" },
+          "chat": { "type": "string" },
+          "responses": { "type": "string" },
+          "anthropic": { "type": "string" },
+          "catalog": { "type": "string" },
+          "website": { "type": "string" },
+          "keysUrl": { "type": "string" },
+          "headers": { "type": "object", "additionalProperties": { "type": "string" } },
+          "balanceURL": { "type": "string" },
+          "balancePath": { "type": "string" },
+          "modelsURL": { "type": "string" },
+          "balanceToken": {
+            "type": "object",
+            "required": ["takes", "set"],
+            "properties": { "takes": { "type": "boolean" }, "set": { "type": "boolean" } }
+          },
+          "key": {
+            "type": "object",
+            "required": ["set", "masked", "optional"],
+            "properties": {
+              "set": { "type": "boolean" },
+              "masked": { "type": "string" },
+              "optional": { "type": "boolean" }
+            }
+          },
+          "ready": { "type": "boolean" },
+          "chosen": { "type": "array", "items": { "type": "string" } },
+          "fallback": { "type": "array", "items": { "type": "string" } },
+          "routing": { "type": "string" },
+          "affinity": { "type": "string" },
+          "models": { "type": "array", "items": { "$ref": "#/components/schemas/ProviderModel" } },
+          "exposed": { "type": "integer" },
+          "unlisted": { "type": "boolean" },
+          "contexts": { "type": "object", "additionalProperties": { "type": "integer" } },
+          "fetched": {
+            "type": "string",
+            "format": "date-time",
+            "description": "When the model list last came from the vendor; absent until it has."
+          },
+          "agents": { "type": "array", "items": { "$ref": "#/components/schemas/ProviderAgent" } },
+          "sponsored": { "type": "boolean" },
+          "keyList": { "type": "array", "items": { "$ref": "#/components/schemas/KeyInfo" } },
+          "account": { "$ref": "#/components/schemas/AccountView" },
+          "decide": { "type": "string", "description": "A decision API." },
+          "searches": { "type": "boolean", "description": "The vendor searches the web by itself." },
+          "proxy": { "type": "string", "description": "The proxy its requests go through." },
+          "accountProxies": {
+            "type": "object",
+            "additionalProperties": { "type": "string" },
+            "description": "The proxy of each of a subscription's accounts that has one of its own, by its name in lower case."
+          },
+          "stepPlan": {
+            "type": "object",
+            "description": "A StepFun provider's Step Plan windows, told only to a platform sign-in."
+          },
+          "zhipuTeam": { "type": "object", "description": "A Zhipu or Z.ai key's team, for a team's GLM Coding Plan." },
+          "draws": { "type": "integer", "description": "How many of its models draw images." },
+          "drawIds": {
+            "type": "array",
+            "items": { "type": "string" },
+            "description": "Those models' ids, listed apart in its editor."
+          },
+          "groups": {
+            "type": "object",
+            "additionalProperties": { "items": { "type": "string" }, "type": "array" },
+            "description": "Groups are the routing groups (\"group/<id>\") each of its models is in, by model id."
+          },
+          "off": { "type": "boolean", "description": "Switched off: kept, but agents get none of its models." },
+          "move": {
+            "type": "object",
+            "description": "Move is where a built-in subscription stands with the community plugin that can run it."
+          }
+        }
+      },
+      "GatewayState": {
+        "type": "object",
+        "required": ["url", "running", "mine", "models", "calls", "groups", "window"],
+        "properties": {
+          "url": { "type": "string", "format": "uri" },
+          "running": { "type": "boolean" },
+          "mine": { "type": "boolean" },
+          "models": { "type": "integer" },
+          "calls": { "type": "array", "items": { "type": "object", "additionalProperties": true } },
+          "groups": { "type": "array", "items": { "type": "object", "additionalProperties": true } },
+          "window": { "type": "boolean", "description": "The magpie serving it shows its routing." }
+        }
+      },
+      "ProviderState": {
+        "type": "object",
+        "required": ["providers", "presets", "excluded", "gateway", "plugins"],
+        "properties": {
+          "providers": { "type": "array", "items": { "$ref": "#/components/schemas/ProviderView" } },
+          "presets": { "type": "array", "items": { "type": "object", "additionalProperties": true } },
+          "excluded": { "type": "array", "items": { "type": "object", "additionalProperties": true } },
+          "gateway": { "$ref": "#/components/schemas/GatewayState" },
+          "codexDaemon": {
+            "type": "string",
+            "description": "CodexDaemon is the account Codex's background app-server is still signed in to after Codex was switched to another."
+          },
+          "plugins": {
+            "type": "array",
+            "items": { "type": "object" },
+            "description": "Plugins are the providers the plugins sign in to, for the add sheet."
+          },
+          "onPlugins": {
+            "type": "array",
+            "items": { "type": "string" },
+            "description": "OnPlugins are the built-in subscriptions moved onto their plugins, which the add sheet offers as the plugin's alone."
+          },
+          "moved": {
+            "type": "array",
+            "items": { "type": "object" },
+            "description": "Moved is the agents the change moved off models it stopped serving, for the page to say so."
+          }
+        }
+      },
+      "ProviderKeyResponse": {
+        "type": "object",
+        "required": ["key"],
+        "properties": { "key": { "type": "string", "readOnly": true } }
+      },
+      "ProviderTestResponse": {
+        "type": "object",
+        "required": ["results", "provider"],
+        "properties": {
+          "results": { "type": "array", "items": { "type": "object", "additionalProperties": true } },
+          "provider": { "type": "object", "additionalProperties": true }
+        }
+      },
+      "ProviderModelsResponse": {
+        "type": "object",
+        "required": ["count", "provider"],
+        "properties": {
+          "count": { "type": "integer" },
+          "provider": { "type": "object", "additionalProperties": true }
+        }
+      },
+      "ProviderActionResponse": {
+        "oneOf": [
+          { "$ref": "#/components/schemas/ProviderState" },
+          { "$ref": "#/components/schemas/ProviderKeyResponse" },
+          { "$ref": "#/components/schemas/ProviderTestResponse" },
+          { "$ref": "#/components/schemas/ProviderModelsResponse" }
+        ]
+      },
+      "LoginChange": {
+        "type": "object",
+        "required": ["agent", "user"],
+        "properties": { "agent": { "type": "string" }, "user": { "type": "string" } }
+      },
+      "KeyChange": {
+        "type": "object",
+        "required": ["id"],
+        "properties": {
+          "id": { "type": "string" },
+          "key": { "type": "string", "writeOnly": true },
+          "name": { "type": "string" },
+          "ref": { "type": "string" },
+          "protocol": { "type": "string" }
+        }
+      },
+      "SignInStatus": {
+        "type": "object",
+        "additionalProperties": true,
+        "properties": {
+          "id": { "type": "string" },
+          "state": { "type": "string", "enum": ["installing", "waiting", "done", "failed", "canceled"] },
+          "url": { "type": "string", "description": "The vendor's page to open, empty until there is one." },
+          "user": { "type": "string" },
+          "error": { "type": "string" },
+          "using": { "type": "boolean" },
+          "agent": { "type": "string" },
+          "code": { "type": "string", "description": "What to type there, for a device code." },
+          "pasteCallback": { "type": "boolean", "description": "A callback URL can also finish this sign-in." },
+          "pasteCode": {
+            "type": "boolean",
+            "description": "PasteCode is a plugin's sign-in finished by the code its page shows."
+          },
+          "instructions": { "type": "string", "description": "A plugin's words for its page." },
+          "installing": {
+            "type": "string",
+            "description": "Installing is the CLI being installed before the sign-in can start."
+          },
+          "plan": { "type": "string" }
+        },
+        "required": ["id", "agent", "url", "state"]
+      },
+      "GroupChange": {
+        "type": "object",
+        "additionalProperties": true,
+        "properties": {
+          "id": { "type": "string" },
+          "name": { "type": "string" },
+          "from": { "type": "string" },
+          "members": { "type": "array", "items": { "type": "string" } },
+          "routing": { "type": "string" },
+          "affinity": { "type": "string" },
+          "rules": { "type": "array", "items": { "type": "object", "additionalProperties": true } }
+        }
+      },
+      "BackupExport": {
+        "type": "object",
+        "required": ["pass", "keys"],
+        "properties": { "pass": { "type": "string", "writeOnly": true }, "keys": { "type": "boolean" } }
+      },
+      "BackupImport": {
+        "type": "object",
+        "required": ["data", "pass", "agents"],
+        "properties": {
+          "data": { "type": "string", "contentEncoding": "base64" },
+          "pass": { "type": "string", "writeOnly": true },
+          "agents": { "type": "boolean" }
+        }
+      },
+      "LibraryChange": {
+        "type": "object",
+        "additionalProperties": true,
+        "properties": {
+          "name": { "type": "string" },
+          "old": { "type": "string" },
+          "agents": { "type": "array", "items": { "type": "string" } },
+          "source": { "type": "string" },
+          "paths": { "type": "array", "items": { "type": "string" } },
+          "server": { "type": "object", "additionalProperties": true },
+          "id": { "type": "string" },
+          "values": { "type": "object", "additionalProperties": { "type": "string" } }
+        }
+      }
+    }
+  }
+}

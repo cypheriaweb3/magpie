@@ -11,6 +11,10 @@ import (
 // updateCmd is `magpie update [check]`: the app replaces its bundle, the
 // terminal build its binary.
 func updateCmd(args []string) error {
+	if update.Disabled {
+		fmt.Println("magpie", version, muted.Render("is Cypheria's build: it is updated with Cypheria, not by itself"))
+		return nil
+	}
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Minute)
 	defer cancel()
 	rel, err := update.Latest(ctx)

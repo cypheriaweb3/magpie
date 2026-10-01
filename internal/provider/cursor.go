@@ -24,11 +24,16 @@ import (
 	"time"
 
 	"github.com/yetone/magpie/internal/catalog"
+	"github.com/yetone/magpie/internal/cypheria"
+	"github.com/yetone/magpie/internal/netproxy"
 	"github.com/yetone/magpie/internal/proc"
 )
 
 // CursorExecutable finds the cursor-agent CLI; a var so tests can fake it.
 var CursorExecutable = func() string {
+	if p, managed := managedCLI("cursor"); managed {
+		return p
+	}
 	for _, name := range []string{"cursor-agent", "agent"} {
 		if p, err := exec.LookPath(name); err == nil && (name == "cursor-agent" || isCursorAgent(p)) {
 			return p
@@ -72,7 +77,7 @@ func askCursorStatus() (user, plan string, ok bool, err error) {
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
-	out, err := agentCommand(ctx, path, "about", "--format", "json").Output()
+	out, err := cliCommand(ctx, "cursor", path, netproxy.Env(nil), "about", "--format", "json").Output()
 	user, plan, said := parseCursorAbout(out)
 	switch {
 	case user != "":
@@ -138,7 +143,7 @@ func cursorModels(ctx context.Context) ([]catalog.Model, error) {
 	}
 	ctx, cancel := context.WithTimeout(ctx, 30*time.Second)
 	defer cancel()
-	out, err := agentCommand(ctx, path, "models").Output()
+	out, err := cliCommand(ctx, "cursor", path, netproxy.Env(nil), "models").Output()
 	if err != nil {
 		return nil, errorf("cursor-agent models: %v", err)
 	}
@@ -280,6 +285,9 @@ func CursorClientVersion() string {
 
 // cursorAuthFile is where cursor-agent keeps its sign-in off a Mac's keychain.
 func cursorAuthFile() string {
+	if dir := cypheria.Native("cursor", "CURSOR_CONFIG_DIR"); dir != "" {
+		return filepath.Join(dir, "auth.json")
+	}
 	home, _ := os.UserHomeDir()
 	switch runtime.GOOS {
 	case "windows":
@@ -351,7 +359,7 @@ func CursorToken() (string, error) {
 			tok = t // renewed while this waited
 		} else {
 			ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
-			_ = agentCommand(ctx, path, "status").Run()
+			_ = cliCommand(ctx, "cursor", path, netproxy.Env(nil), "status").Run()
 			cancel()
 			tok = readCursorToken()
 		}

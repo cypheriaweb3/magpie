@@ -454,6 +454,9 @@ func (h *host) call(ctx context.Context, method string, params, out any) error {
 
 // Call starts the host if need be and asks it method.
 func Call(ctx context.Context, method string, params, out any) error {
+	if pluginsOff() {
+		return errOff
+	}
 	h, err := get(ctx)
 	if err != nil {
 		return err
@@ -464,6 +467,9 @@ func Call(ctx context.Context, method string, params, out any) error {
 // Plugins is how each plugin fared when the host loaded it, starting the
 // host if need be.
 func Plugins(ctx context.Context) ([]Loaded, error) {
+	if pluginsOff() {
+		return nil, nil
+	}
 	h, err := get(ctx)
 	if err != nil {
 		return nil, err

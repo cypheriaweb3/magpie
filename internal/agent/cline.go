@@ -45,6 +45,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/yetone/magpie/internal/cypheria"
 	"github.com/yetone/magpie/internal/edit"
 	"github.com/yetone/magpie/internal/gateway"
 )
@@ -53,11 +54,11 @@ import (
 const clineSlot = "openai-compatible"
 
 func cline(home string) *Agent {
-	dir := os.Getenv("CLINE_DIR")
+	dir := cypheria.Getenv("cline", "CLINE_DIR")
 	if dir == "" {
 		dir = filepath.Join(home, ".cline")
 	}
-	data := os.Getenv("CLINE_DATA_DIR")
+	data := cypheria.Getenv("cline", "CLINE_DATA_DIR")
 	if data == "" {
 		data = filepath.Join(dir, "data")
 	}

@@ -17,6 +17,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/yetone/magpie/internal/cypheria"
 	"github.com/yetone/magpie/internal/filememo"
 )
 
@@ -167,6 +168,9 @@ var (
 
 // CachePath is where `magpie sync` stores the models.dev catalog.
 func CachePath() string {
+	if d, ok := cypheria.CacheDir(); ok {
+		return filepath.Join(d, "models.json")
+	}
 	if x := os.Getenv("XDG_CACHE_HOME"); x != "" {
 		return filepath.Join(x, "magpie", "models.json")
 	}

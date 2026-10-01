@@ -6,10 +6,12 @@ import (
 	"path/filepath"
 	"slices"
 	"strings"
+
+	"github.com/yetone/magpie/internal/cypheria"
 )
 
 func codexConfigPath() string {
-	dir := os.Getenv("CODEX_HOME")
+	dir := cypheria.Getenv("codex", "CODEX_HOME")
 	if dir == "" {
 		home, _ := os.UserHomeDir()
 		dir = filepath.Join(home, ".codex")
